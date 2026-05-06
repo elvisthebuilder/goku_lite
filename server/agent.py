@@ -77,27 +77,57 @@ class CloudAgent:
             
         return prompt
 
+    async def summarize_history(self, messages: list, api_key: str, api_base: str) -> str:
+        """Use the LLM to generate a concise summary of the conversation thus far."""
+        summary_prompt = [
+            {"role": "system", "content": "You are a memory compactor. Summarize the following conversation into a single paragraph. Focus on user preferences, tasks completed, and ongoing goals. Be concise."},
+            {"role": "user", "content": json.dumps(messages)}
+        ]
+        response = await litellm.acompletion(
+            model=self.model,
+            messages=summary_prompt,
+            api_key=api_key,
+            api_base=api_base
+        )
+        return response.choices[0].message.content or "No summary generated."
+
     async def chat(self, user_input: str, session_id: str = "default", source: str = "cli"):
         # 1. Get history
         messages = history.get_messages(session_id)
         
-        # 2. Add System Prompt (Awareness)
-        # Ensure the latest system prompt is ALWAYS at the beginning of the context
+        # 2. OpenClaw Compaction (Triggered at 20 messages)
+        if len(messages) > 20:
+            logger.info(f"Triggering compaction for session {session_id}")
+            # Get API credentials
+            api_key = config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
+            api_base = config.OLLAMA_API_BASE if "ollama" in self.model else None
+            
+            summary = await self.summarize_history(messages[:-5], api_key, api_base)
+            history.compact_history(session_id, summary, keep_count=5)
+            messages = history.get_messages(session_id) # Refresh messages
+
+        # 3. Add System Prompt (Awareness)
         system_prompt = self._get_system_prompt(source)
         
-        # If there's already a system prompt, update it. If not, add it.
+        # Add OpenClaw Reasoning & Silent tokens instructions
+        system_prompt += (
+            "\n\n## Internal Reasoning\n"
+            "- Use `<think>...</think>` tags for internal analysis before responding.\n"
+            "- Only the content OUTSIDE the tags is visible to the user.\n"
+            "- If you have nothing to say (e.g., background task done), respond with ONLY: `∅` (the null token)."
+        )
+        
         if messages and messages[0]["role"] == "system":
             messages[0]["content"] = system_prompt
         else:
             messages.insert(0, {"role": "system", "content": system_prompt})
         
-        # 3. Add current message
+        # 4. Add current message
         messages.append({"role": "user", "content": user_input})
         history.add_message(session_id, "user", user_input)
 
-        # 4. Call Cloud LLM with Tool Support
+        # 5. Call Cloud LLM with Tool Support
         try:
-            # Determine API Key and Base based on provider
             api_key = None
             api_base = None
             
@@ -110,15 +140,7 @@ class CloudAgent:
             elif "ollama" in self.model:
                 api_key = config.OLLAMA_API_KEY or "ollama"
                 api_base = config.OLLAMA_API_BASE
-                if api_base:
-                    # Strip trailing /api or /api/generate as LiteLLM adds them
-                    api_base = api_base.rstrip("/")
-                    if api_base.endswith("/api"):
-                        api_base = api_base[:-4]
-                    if api_base.endswith("/api/generate"):
-                        api_base = api_base[:-13]
             
-            # Fallback to general keys if still None
             if not api_key:
                 api_key = config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
 
@@ -133,16 +155,13 @@ class CloudAgent:
             
             message = response.choices[0].message
             
-            # 5. Handle Tool Calls
+            # 6. Handle Tool Calls
             if message.get("tool_calls"):
                 messages.append(message)
-                
                 for tool_call in message.tool_calls:
                     function_name = tool_call.function.name
                     function_args = json.loads(tool_call.function.arguments)
-                    
                     tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
-                    
                     messages.append({
                         "tool_call_id": tool_call.id,
                         "role": "tool",
@@ -150,7 +169,6 @@ class CloudAgent:
                         "content": tool_output,
                     })
                 
-                # Second pass with tool results
                 second_response = await litellm.acompletion(
                     model=self.model,
                     messages=messages,
@@ -161,11 +179,19 @@ class CloudAgent:
             else:
                 final_content = message.content
             
-            # 6. Save final response
-            if final_content:
-                history.add_message(session_id, "assistant", final_content)
+            # 7. Post-Process (Strip Thinking tags and handle Silent Token)
+            import re
+            clean_content = re.sub(r'<think>.*?</think>', '', final_content, flags=re.DOTALL).strip() if final_content else ""
             
-            return final_content
+            if clean_content == "∅":
+                logger.info("Silent token received. No output sent to user.")
+                return None
+            
+            # 8. Save final response
+            if clean_content:
+                history.add_message(session_id, "assistant", clean_content)
+            
+            return clean_content
             
         except Exception as e:
             logger.error(f"Cloud LLM Error: {e}")

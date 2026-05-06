@@ -55,10 +55,36 @@ class CloudHistory:
             db.add(msg)
             db.commit()
 
-    def get_messages(self, session_id: str):
+    def get_messages(self, session_id: str, limit: int = 50):
         with self.Session() as db:
             messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
             return [{"role": m.role, "content": m.content} for m in messages]
+
+    def compact_history(self, session_id: str, summary: str, keep_count: int = 5):
+        """
+        Implements OpenClaw-style compaction.
+        Keeps the latest 'keep_count' messages and replaces the rest with a summary.
+        """
+        with self.Session() as db:
+            messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
+            if len(messages) <= keep_count:
+                return
+
+            # Messages to delete (everything except the last 'keep_count')
+            to_delete = messages[:-keep_count]
+            for m in to_delete:
+                db.delete(m)
+            
+            # Insert the summary as a system message at the start
+            summary_msg = MessageModel(
+                session_id=session_id, 
+                role="system", 
+                content=f"[CONVERSATION SUMMARY]: {summary}",
+                msg_type="summary"
+            )
+            db.add(summary_msg)
+            db.commit()
+            logger.info(f"Compacted history for session {session_id}. Kept last {keep_count} turns.")
 
     def clear_history(self, session_id: str):
         """Wipes all messages for a specific session."""
