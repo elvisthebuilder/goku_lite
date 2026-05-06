@@ -9,8 +9,9 @@ echo "🐉 Goku Lite [v1.0.4]: Starting Force Installation..."
 
 # 1. Force Clean State (Required for Production reliability)
 INSTALL_DIR="/opt/goku-lite"
-echo "🧹 Wiping any existing installation at $INSTALL_DIR..."
-sudo rm -rf "$INSTALL_DIR"
+echo "🧹 Cleaning existing installation at $INSTALL_DIR..."
+# Delete contents but keep the directory to avoid "ghost directory" errors
+sudo find "$INSTALL_DIR" -mindepth 1 -delete || true
 
 # 2. System Dependencies
 echo "🛠️  Installing System Dependencies (python3-venv, ffmpeg, git)..."
