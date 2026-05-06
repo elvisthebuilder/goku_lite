@@ -6,16 +6,22 @@ import os
 import sys
 import subprocess
 
+# Get the absolute path to the directory where this script is located
+base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, ".env")
+
+from dotenv import load_dotenv
+load_dotenv(env_path)
+
 # Guard: Ensure configuration exists before loading other modules
-env_path = os.path.join(os.getcwd(), ".env")
 if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
     print("🐉 Goku Lite: Missing configuration. Launching Onboarding Wizard...")
     try:
         # Run setup.py and wait for it to finish
-        subprocess.run([sys.executable, "setup.py"], check=True)
+        setup_script = os.path.join(base_dir, "setup.py")
+        subprocess.run([sys.executable, setup_script], check=True)
         # Reload environment variables after setup
-        from dotenv import load_dotenv
-        load_dotenv(override=True)
+        load_dotenv(env_path, override=True)
     except Exception as e:
         print(f"❌ Failed to launch onboarding: {e}")
         sys.exit(1)
@@ -24,7 +30,6 @@ if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
 from server.agent import agent
 from server.config import config
 from server.telegram_handler import start_telegram_bot
-from server.whatsapp_handler import start_whatsapp_bot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("GokuLite")
@@ -65,6 +70,7 @@ async def start_gateway():
     
     # Start WhatsApp (Optional)
     if os.getenv("ENABLE_WHATSAPP") == "True":
+        from server.whatsapp_handler import start_whatsapp_bot
         tasks.append(start_whatsapp_bot())
     
     if tasks:

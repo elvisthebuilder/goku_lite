@@ -1,7 +1,7 @@
 import logging
 import asyncio
 from neonize.client import NewClient
-from neonize.events import MessageEvent
+from neonize.events import MessageEv
 from .agent import agent
 from .config import config
 
@@ -12,8 +12,8 @@ async def start_whatsapp_bot():
     # but for now we'll use a small sqlite file for the session only.
     client = NewClient("goku_lite_wa.db")
 
-    @client.event(MessageEvent)
-    async def on_message(client, message: MessageEvent):
+    @client.event(MessageEv)
+    async def on_message(client, message: MessageEv):
         if message.Message.conversation:
             user_text = message.Message.conversation
             chat_id = message.Info.MessageSource.Chat.String()

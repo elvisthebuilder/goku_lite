@@ -3,14 +3,20 @@ import sys
 import subprocess
 import asyncio
 
+# Get the absolute path to the directory where this script is located
+base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, ".env")
+
+from dotenv import load_dotenv
+load_dotenv(env_path)
+
 # Guard: Ensure configuration exists
-env_path = os.path.join(os.getcwd(), ".env")
 if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
     print("🐉 Goku Lite: Missing configuration. Launching Onboarding Wizard...")
     try:
-        subprocess.run([sys.executable, "setup.py"], check=True)
-        from dotenv import load_dotenv
-        load_dotenv(override=True)
+        setup_script = os.path.join(base_dir, "setup.py")
+        subprocess.run([sys.executable, setup_script], check=True)
+        load_dotenv(env_path, override=True)
     except Exception as e:
         print(f"❌ Setup failed: {e}")
         sys.exit(1)
