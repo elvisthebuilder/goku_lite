@@ -33,6 +33,7 @@ sudo rm -rf "$TEMP_CLONE"
 
 sudo chown -R $USER:$USER $INSTALL_DIR
 cd $INSTALL_DIR
+git config --global --add safe.directory "$INSTALL_DIR" || true
 
 # 4. Virtual Environment
 echo "🐍 Setting up Virtual Environment..."
