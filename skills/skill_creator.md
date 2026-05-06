@@ -21,7 +21,8 @@ Always format new skills like this:
 ```
 
 ## Storage:
-When a skill is finalized, use `execute_command` to save it into the `skills/` directory of the repository.
+- **Skills**: Save finalized skills into the `skills/` directory.
+- **Scripts**: Save reusable Python or Bash helper scripts into the `scripts/` directory. Reference them in your skills for deterministic task execution.
 
 ## Triggering:
 Encourage the user to create skills for things they do often (e.g., "Summarize my meetings", "Scan my logs for errors", "Draft my daily report").
