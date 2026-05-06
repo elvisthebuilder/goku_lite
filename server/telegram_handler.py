@@ -40,7 +40,7 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🐉 *Link Established.*\nI am awake and monitoring your systems. Speak when you're ready.", parse_mode="Markdown")
     
     elif command == "/new":
-        history.clear_session(session_id)
+        history.delete_session(session_id)
         await update.message.reply_text("🧼 *Context Cleared.*\nI've wiped our recent history. I'm ready to read myself into being again.", parse_mode="Markdown")
     
     elif command == "/status":
