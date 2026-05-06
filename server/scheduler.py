@@ -56,30 +56,44 @@ async def _morning_briefing():
     logger.info("📤 Sending morning briefing with system metrics...")
     await _push_message(msg)
 
-async def _health_check():
-    """Check server health and alert if something is wrong."""
-    import subprocess
-    try:
-        # Check memory usage
-        result = subprocess.run(
-            ["free", "-m"], capture_output=True, text=True, timeout=5
-        )
-        lines = result.stdout.strip().split("\n")
-        mem_line = lines[1].split()
-        total = int(mem_line[1])
-        used = int(mem_line[2])
-        percent = (used / total) * 100
+# Track last readings for spike detection
+_last_ram_percent = None
+_last_disk_percent = None
 
-        if percent > 85:
-            msg = (
-                f"🚨 *Memory Alert!*\n"
-                f"I'm using {percent:.0f}% of RAM right now ({used}MB / {total}MB). "
-                f"Things might slow down. You may want to restart me with `goku-lite-restart`."
-            )
-            logger.warning(f"⚠️ High memory usage: {percent:.0f}%")
-            await _push_message(msg)
+async def _health_check():
+    """Check server health and alert if something is wrong or increasing rapidly."""
+    import subprocess
+    global _last_ram_percent, _last_disk_percent
+    
+    try:
+        # 1. Check RAM
+        free = subprocess.check_output(["free", "-m"]).decode().split("\n")[1].split()
+        total_ram = int(free[1])
+        used_ram = int(free[2])
+        ram_percent = (used_ram / total_ram) * 100
+
+        # Detect RAM Spike
+        if _last_ram_percent is not None:
+            spike = ram_percent - _last_ram_percent
+            if spike > 20: # 20% jump in 10 mins
+                await _push_message(f"⚠️ *Rapid RAM Increase:* Memory usage just jumped by {spike:.0f}% in the last 10 minutes! Something might be leaking.")
+
+        if ram_percent > 85:
+            await _push_message(f"🚨 *High Memory Alert:* {ram_percent:.0f}% used. System is at risk of crashing.")
+        
+        _last_ram_percent = ram_percent
+
+        # 2. Check Disk
+        df = subprocess.check_output(["df", "-h", "/"]).decode().split("\n")[1].split()
+        disk_percent = int(df[4].replace("%", ""))
+
+        if disk_percent > 90:
+            await _push_message(f"🚨 *Critical Disk Alert:* {disk_percent}% used. Only {df[3]} left! I might stop being able to save logs soon.")
+        
+        _last_disk_percent = disk_percent
+
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Guardian health check failed: {e}")
 
 async def schedule_one_time(delay_seconds: int, message: str):
     """Schedule a one-time reminder after a delay."""
@@ -102,7 +116,7 @@ def start_scheduler(briefing_hour: int = 8, briefing_minute: int = 0):
     if scheduler.running:
         return
 
-    # Daily morning briefing (default: 8:00 AM UTC)
+    # Daily morning briefing
     scheduler.add_job(
         _morning_briefing,
         CronTrigger(hour=briefing_hour, minute=briefing_minute),
@@ -110,13 +124,13 @@ def start_scheduler(briefing_hour: int = 8, briefing_minute: int = 0):
         replace_existing=True
     )
 
-    # Health check every 30 minutes
+    # Guardian check every 10 minutes
     scheduler.add_job(
         _health_check,
-        IntervalTrigger(minutes=30),
+        IntervalTrigger(minutes=10),
         id="health_check",
         replace_existing=True
     )
 
     scheduler.start()
-    logger.info(f"🕐 Goku Scheduler started. Briefing at {briefing_hour:02d}:{briefing_minute:02d} UTC daily.")
+    logger.info(f"🕐 Goku Guardian active. Checking system every 10 minutes.")
