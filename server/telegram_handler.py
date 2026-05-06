@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from .agent import agent
@@ -13,27 +14,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_text = update.message.text
     chat_id = str(update.message.chat_id)
+    username = update.message.from_user.username or "Unknown"
     
-    logger.info(f"Telegram message from {chat_id}: {user_text}")
+    logger.info(f"📩 Telegram incoming: [{username}] ({chat_id}): {user_text}")
     
-    # Simple logic: Respond if it's a private chat or if mentioned
+    # Check if it's a private chat or if the bot is mentioned
     is_private = update.message.chat.type == "private"
-    is_mention = context.bot.username in user_text if context.bot.username else False
+    bot_username = context.bot.username
+    is_mention = (bot_username in user_text) if bot_username else False
     
+    # Also check for GOKU_OWNER_ID if set
+    owner_id = os.getenv("GOKU_OWNER_ID")
+    if owner_id and chat_id != owner_id and is_private:
+        logger.warning(f"🚫 Unauthorized access attempt from {chat_id}")
+        await update.message.reply_text("⚠️ Access Denied: You are not my authorized owner.")
+        return
+
     if is_private or is_mention:
-        response = await agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram")
-        
-        # Check if ElevenLabs is configured and user wants voice
-        if os.getenv("ELEVENLABS_API_KEY") and "[VOICE]" in user_text.upper():
-            voice_path = await voice_engine.text_to_speech(response)
-            if voice_path:
-                with open(voice_path, "rb") as audio:
-                    await update.message.reply_voice(audio)
-                os.remove(voice_path)
-            else:
-                await update.message.reply_text(response)
-        else:
+        try:
+            logger.info(f"🤖 Goku is thinking for {chat_id}...")
+            response = await agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram")
             await update.message.reply_text(response)
+        except Exception as e:
+            logger.error(f"❌ Telegram Error: {e}")
+            await update.message.reply_text("📦 Sorry, I hit a snag while thinking. Please try again.")
 
 async def start_telegram_bot():
     token = config.TELEGRAM_BOT_TOKEN
@@ -41,16 +45,20 @@ async def start_telegram_bot():
         logger.warning("TELEGRAM_BOT_TOKEN not set. Telegram bot will not start.")
         return
 
-    application = ApplicationBuilder().token(token).build()
-    
-    text_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
-    application.add_handler(text_handler)
+    try:
+        application = ApplicationBuilder().token(token).build()
+        
+        # Add handler for all text messages
+        text_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
+        application.add_handler(text_handler)
 
-    logger.info("🐉 Goku Lite: Telegram bot starting...")
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-    
-    # Keep it running
-    while True:
-        await asyncio.sleep(3600)
+        logger.info("🐉 Goku Lite: Telegram bot initialized and polling...")
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        
+        # Keep the task alive
+        while True:
+            await asyncio.sleep(3600)
+    except Exception as e:
+        logger.error(f"💥 Failed to start Telegram bot: {e}")

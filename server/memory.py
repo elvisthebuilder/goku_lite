@@ -67,7 +67,10 @@ class CloudMemory:
             )
             return resp.data[0]['embedding']
         except Exception as e:
-            logger.error(f"Embedding failed: {e}")
+            if "401" in str(e) or "Unauthorized" in str(e):
+                logger.warning(f"Memory Note: Embedding provider ({model}) unauthorized. Check keys. Continuing without memory.")
+            else:
+                logger.error(f"Embedding failed: {e}")
             return None
 
     async def add_memory(self, text: str, metadata: dict = None):
