@@ -9,6 +9,10 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    
+    # Ollama / Remote
+    OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE")
+    OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY")
 
     # Memory
     QDRANT_URL = os.getenv("QDRANT_URL")

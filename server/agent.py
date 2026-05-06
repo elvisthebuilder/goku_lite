@@ -44,12 +44,31 @@ class CloudAgent:
 
         # 4. Call Cloud LLM with Tool Support
         try:
+            # Determine API Key and Base based on provider
+            api_key = None
+            api_base = None
+            
+            if self.model.startswith("gpt") or "openai" in self.model:
+                api_key = config.OPENAI_API_KEY
+            elif self.model.startswith("claude") or "anthropic" in self.model:
+                api_key = config.ANTHROPIC_API_KEY
+            elif "gemini" in self.model:
+                api_key = config.GEMINI_API_KEY
+            elif "ollama" in self.model:
+                api_key = config.OLLAMA_API_KEY or "ollama" # LiteLLM needs a non-empty key for some providers
+                api_base = config.OLLAMA_API_BASE
+            
+            # Fallback to general keys if still None
+            if not api_key:
+                api_key = config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
+
             response = await litellm.acompletion(
                 model=self.model,
                 messages=messages,
                 tools=tool_registry.tools,
                 tool_choice="auto",
-                api_key=config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
+                api_key=api_key,
+                api_base=api_base
             )
             
             message = response.choices[0].message
@@ -75,7 +94,8 @@ class CloudAgent:
                 second_response = await litellm.acompletion(
                     model=self.model,
                     messages=messages,
-                    api_key=config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
+                    api_key=api_key,
+                    api_base=api_base
                 )
                 final_content = second_response.choices[0].message.content
             else:
