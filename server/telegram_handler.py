@@ -44,9 +44,17 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🧼 *Context Cleared.*\nI've wiped our recent history. I'm ready to read myself into being again.", parse_mode="Markdown")
     
     elif command == "/status":
-        await update.message.reply_text("🔍 *Health Check Initiated...*", parse_mode="Markdown")
-        from .scheduler import _health_check
-        await _health_check()
+        from .scheduler import get_system_report
+        ram, disk = await get_system_report()
+        
+        status_msg = (
+            "⚡ *System Status Report*\n\n"
+            f"*RESOURCES*\n"
+            f"RAM: {ram}\n"
+            f"Disk: {disk}\n\n"
+            "All systems normal."
+        )
+        await update.message.reply_text(status_msg, parse_mode="Markdown")
     
     elif command == "/briefing":
         await update.message.reply_text("📊 *Generating Briefing...*", parse_mode="Markdown")

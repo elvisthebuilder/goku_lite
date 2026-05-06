@@ -19,41 +19,50 @@ async def _push_message(message: str):
         return
     await send_proactive_message(chat_id=owner_id, text=message)
 
-async def _morning_briefing():
-    """Send a daily morning briefing with system stats."""
-    from .config import config
+async def get_system_report():
+    """Fetch raw system metrics via shell for maximum reliability."""
     import subprocess
-    
-    now = datetime.utcnow().strftime("%A, %B %d, %Y")
-    db_status = "✅ Connected" if config.DATABASE_URL else "⚠️ Local"
-    mem_status = "✅ Active" if config.QDRANT_API_KEY else "⚠️ Disabled"
-    model = config.GOKU_MODEL or "Unknown"
-
-    # Fetch System Stats
-    ram_info = "Unknown"
-    disk_info = "Unknown"
+    ram = "Unknown"
+    disk = "Unknown"
     try:
         # RAM
-        free = subprocess.check_output(["free", "-m"]).decode().split("\n")[1].split()
-        ram_info = f"{free[2]}MB / {free[1]}MB used"
+        free = subprocess.check_output("free -h", shell=True).decode().split("\n")[1].split()
+        ram = f"{free[2]} used / {free[1]} total"
         # Disk
-        df = subprocess.check_output(["df", "-h", "/"]).decode().split("\n")[1].split()
-        disk_info = f"{df[2]} / {df[1]} used ({df[4]})"
-    except Exception:
-        pass
+        df = subprocess.check_output("df -h /", shell=True).decode().split("\n")[1].split()
+        disk = f"{df[2]} used / {df[1]} total ({df[4]})"
+    except Exception as e:
+        logger.error(f"Failed to fetch metrics: {e}")
+    return ram, disk
 
+async def _morning_briefing():
+    """Send a professional system briefing."""
+    from .config import config
+    
+    hour = datetime.utcnow().hour
+    if 5 <= hour < 12:
+        greeting = "Good morning"
+    elif 12 <= hour < 17:
+        greeting = "Good afternoon"
+    elif 17 <= hour < 21:
+        greeting = "Good evening"
+    else:
+        greeting = "Greetings"
+
+    now = datetime.utcnow().strftime("%A, %B %d, %Y")
+    ram, disk = await get_system_report()
+    
     msg = (
-        f"🌅 *Good morning!* It's {now}.\n\n"
-        f"🛡️ *System Health:*\n"
-        f"• *RAM:* {ram_info}\n"
-        f"• *Disk:* {disk_info}\n\n"
-        f"🧠 *Brain Status:*\n"
-        f"• *Model:* {model}\n"
-        f"• *Database:* {db_status}\n"
-        f"• *Memory Cloud:* {mem_status}\n\n"
-        f"Everything is looking sharp. I'm ready for orders! 🐉"
+        f"⚡ *{greeting}.* It is {now}.\n\n"
+        f"*SYSTEM STATUS*\n"
+        f"RAM: {ram}\n"
+        f"Disk: {disk}\n\n"
+        f"*BRAIN STATUS*\n"
+        f"Model: {config.GOKU_MODEL or 'Unknown'}\n"
+        f"Database: {'Connected' if config.DATABASE_URL else 'Local'}\n"
+        f"Memory: {'Active' if config.QDRANT_API_KEY else 'Disabled'}\n\n"
+        f"All systems operational. Standing by."
     )
-    logger.info("📤 Sending morning briefing with system metrics...")
     await _push_message(msg)
 
 # Track last readings for spike detection
