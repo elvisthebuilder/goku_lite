@@ -36,7 +36,7 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Unauthorized.")
         return
 
-    if command == "/start":
+    if command in ["/start", "/new"]:
         # Silently clear history and trigger a proactive introduction
         history.delete_session(session_id)
         
