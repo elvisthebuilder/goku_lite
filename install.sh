@@ -1,31 +1,36 @@
 #!/bin/bash
 
-# 🐉 Goku Lite Installer v1.0.2
+# 🐉 Goku Lite Installer v1.0.3
 # Built by Elvis The Builder
 
 set -e
 
-echo "🐉 Goku Lite [v1.0.2]: Starting Elite Installation..."
+echo "🐉 Goku Lite [v1.0.3]: Starting Elite Installation..."
 
-# 1. System Dependencies (Force install at top)
+# 1. System Dependencies
 echo "🛠️  Installing System Dependencies (python3-venv, ffmpeg, git)..."
 sudo apt-get update
 sudo apt-get install -y python3-venv ffmpeg git python3-pip
 
 # 2. Setup Directory
 INSTALL_DIR="/opt/goku-lite"
-echo "📂 Installing to $INSTALL_DIR..."
-sudo mkdir -p $INSTALL_DIR
+echo "📂 Preparing Installation Directory..."
 
-# Clone fresh if needed
-if [ ! -d "$INSTALL_DIR/.git" ]; then
-    echo "📥 Cloning fresh from GitHub..."
-    sudo rm -rf $INSTALL_DIR/*
-    sudo git clone https://github.com/elvisthebuilder/goku_lite.git $INSTALL_DIR
+if [ -d "$INSTALL_DIR" ]; then
+    if [ ! -d "$INSTALL_DIR/.git" ]; then
+        echo "⚠️  Existing non-git directory found. Wiping for clean install..."
+        sudo rm -rf "$INSTALL_DIR"
+        sudo mkdir -p "$INSTALL_DIR"
+        sudo git clone https://github.com/elvisthebuilder/goku_lite.git "$INSTALL_DIR"
+    else
+        echo "🔄 Existing repository found. Updating..."
+        cd "$INSTALL_DIR"
+        sudo git pull origin main
+    fi
 else
-    echo "🔄 Updating existing installation..."
-    cd $INSTALL_DIR
-    sudo git pull origin main
+    echo "📥 Creating directory and cloning fresh..."
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo git clone https://github.com/elvisthebuilder/goku_lite.git "$INSTALL_DIR"
 fi
 
 sudo chown -R $USER:$USER $INSTALL_DIR
@@ -33,12 +38,20 @@ cd $INSTALL_DIR
 
 # 3. Virtual Environment
 echo "🐍 Setting up Virtual Environment..."
-# Check for specific python version to ensure venv works
 PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-echo "Detected Python $PY_VER. Ensuring python3.$PY_VER-venv..."
-sudo apt-get install -y "python3.$PY_VER-venv" || sudo apt-get install -y python3-venv
+sudo apt-get install -y "python3.$PY_VER-venv" || true
 
-python3 -m venv venv
+# Delete existing venv if broken
+if [ -d "venv" ]; then
+    if [ ! -f "venv/bin/python" ]; then
+        echo "⚠️  Broken venv detected. Recreating..."
+        rm -rf venv
+    fi
+fi
+
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
 source venv/bin/activate
 
 # 4. Dependencies
@@ -114,7 +127,7 @@ EOF
 
 sudo chmod +x /usr/local/bin/goku-lite*
 
-echo "✨ Goku Lite [v1.0.2] Installation Complete!"
+echo "✨ Goku Lite [v1.0.3] Installation Complete!"
 echo "------------------------------------------------"
 echo "🐉 Setup:    goku-lite-setup"
 echo "🐉 Start:    goku-lite-start"
