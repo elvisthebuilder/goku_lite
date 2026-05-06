@@ -34,6 +34,7 @@ class CloudAgent:
         # Load global skills
         base += self._get_skill("personality")
         base += self._get_skill("data_presentation")
+        base += self._get_skill("no_hallucination")
         
         if source == "cli":
             return base + "\n\n[CONTEXT] You are currently interacting via a Command Line Interface (CLI)."

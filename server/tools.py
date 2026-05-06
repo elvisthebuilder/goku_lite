@@ -152,6 +152,14 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "get_system_metrics",
+                    "description": "Fetch REAL RAM and Disk usage from the Linux server. Use this whenever the user asks about specs.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "clear_history",
                     "description": "Wipe the current conversation history. Use this if the user wants to start a fresh chat or forget the current context.",
                     "parameters": {"type": "object", "properties": {}}
@@ -268,6 +276,19 @@ class ToolRegistry:
             from .scheduler import schedule_one_time
             asyncio.create_task(schedule_one_time(delay_seconds, message))
             return f"Got it! I'll remind you about '{message}' in {delay_minutes} minute(s)."
+
+        elif tool_name == "get_system_metrics":
+            try:
+                import subprocess
+                # RAM
+                ram = subprocess.check_output(["free", "-m"]).decode()
+                # DISK
+                disk = subprocess.check_output(["df", "-h", "/"]).decode()
+                # DATE
+                date = subprocess.check_output(["date"]).decode()
+                return f"REAL SYSTEM METRICS:\n\nRAM:\n{ram}\nDISK:\n{disk}\nCURRENT TIME:\n{date}"
+            except Exception as e:
+                return f"Failed to fetch metrics: {e}"
 
         elif tool_name == "update_briefing_time":
             hour = args.get("hour")
