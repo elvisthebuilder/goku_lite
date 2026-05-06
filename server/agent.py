@@ -60,7 +60,13 @@ class CloudAgent:
         prompt += self._load_file("USER.md")
         prompt += self._load_file("TOOLS.md")
         
-        # 3. Inject Runtime Info
+        # 3. Inject Documentation Guidance
+        prompt += (
+            "\n\n## Documentation\n"
+            "For behavior, commands, or architecture: consult local docs in the `docs/` directory first using the `read` tool."
+        )
+        
+        # 4. Inject Runtime Info
         prompt += self._get_runtime_info()
         
         # 4. Inject Channel-Specific Logic
