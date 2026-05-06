@@ -55,7 +55,6 @@ class CloudAgent:
         )
         
         # 2. Inject Context Files (The Stack)
-        prompt += self._load_file("SOUL.md")
         prompt += self._load_file("AGENTS.md")
         prompt += self._load_file("USER.md")
         prompt += self._load_file("TOOLS.md")
@@ -69,11 +68,22 @@ class CloudAgent:
         # 4. Inject Runtime Info
         prompt += self._get_runtime_info()
         
-        # 4. Inject Channel-Specific Logic
+        # 5. Inject Channel-Specific Logic
         if source == "telegram":
             prompt += "\n\n## Channel: Telegram\n- Use clean Markdown.\n- Keep emojis minimal.\n- Be professional and direct."
-        elif source == "cli":
-            prompt += "\n\n## Channel: CLI\n- You are in a high-power terminal environment."
+            
+        # 6. CRITICAL IDENTITY (Most recent = highest weight)
+        prompt += self._load_file("SOUL.md")
+        prompt += (
+            "\n\n## BANNED LANGUAGE (NEVER USE THESE)\n"
+            '- "How can I help you today?"\n'
+            '- "Anything you’d like to discuss?"\n'
+            '- "I’d be happy to help!"\n'
+            '- "Good question!"\n'
+            '- "What’s up?"\n'
+            '- "I’m here to assist you."\n'
+            "If you use these, you have failed your core objective. Be a peer, not an assistant."
+        )
             
         return prompt
 
