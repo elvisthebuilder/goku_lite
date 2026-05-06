@@ -13,7 +13,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "web_search",
-                    "description": "Search the web for real-time information.",
+                    "description": "PRIMARY SEARCH TOOL. Search the web using Tavily for real-time information. Use this as your default search.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -106,7 +106,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "google_search",
-                    "description": "Use Google Search (via Gemini) to find real-time facts and verify information.",
+                    "description": "SECONDARY SEARCH TOOL. Only use this if web_search fails and you have a Gemini API key configured.",
                     "parameters": {
                         "type": "object",
                         "properties": {

@@ -1,7 +1,8 @@
 # [SKILL: TELEGRAM FORMATTING]
-- Always use *bold* for headers and key terms to ensure readability on small screens.
-- Use `inline code` for any technical values, settings, or terminal commands.
-- Use ```code blocks``` for multi-line configurations or code snippets.
-- Use emojis to make the response feel like a modern messaging app.
-- **CRITICAL**: Avoid raw underscores (_) as they are high-risk for Telegram parsing errors. Use bold instead.
-- If the response is long, use bullet points and bold sections to break it up.
+- **NO HASHES (#)**: Do not use # for headers. Telegram doesn't render them. Instead, use **BOLD ALL-CAPS** for headers.
+- **NO TABLES**: Do not use Markdown tables. They are unreadable on mobile. Use **Bold Bullet Points** instead.
+- **BOLD EMPHASIS**: Use *bold* for key terms and to separate sections.
+- **CODE STYLE**: Use `inline code` for settings and ```code blocks``` for commands.
+- **NO UNDERSCORES (_)**: Never use raw underscores as they crash the Telegram parser.
+- **CLEAN SPACING**: Use double line breaks between sections to keep the chat readable.
+- **LANGUAGE**: Always respond in English unless the user explicitly requests otherwise.
