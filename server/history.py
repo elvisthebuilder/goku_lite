@@ -34,7 +34,12 @@ class CloudHistory:
             self.url = "sqlite:///goku_lite_fallback.db"
             logger.warning("DATABASE_URL not set. Falling back to local SQLite.")
         
-        self.engine = create_engine(self.url)
+        self.engine = create_engine(
+            self.url,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            connect_args={"sslmode": "require"} if "sqlite" not in self.url else {}
+        )
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
