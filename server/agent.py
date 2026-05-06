@@ -24,8 +24,12 @@ class CloudAgent:
 
     def _get_system_prompt(self, source: str):
         """Generate a source-aware system prompt."""
+        from datetime import datetime
+        now_utc = datetime.utcnow().strftime("%A, %B %d, %Y %H:%M:%S UTC")
+        
         base = (
-            "You are Goku Lite v1.0, an elite cloud-native AI agent. "
+            f"You are Goku Lite v1.0, an elite cloud-native AI agent.\n"
+            f"CURRENT TIME: {now_utc}\n\n"
             "You are lightweight yet powerful, designed to run on minimal hardware while wielding infinite cloud power. "
             "CRITICAL: Always respond in English unless the user explicitly requests another language. "
             "You have full access to a terminal, file system, and long-term cloud memory."

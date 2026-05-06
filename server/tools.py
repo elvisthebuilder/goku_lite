@@ -160,6 +160,14 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "get_current_time",
+                    "description": "Fetch the absolute current UTC time from the server clock.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "clear_history",
                     "description": "Wipe the current conversation history. Use this if the user wants to start a fresh chat or forget the current context.",
                     "parameters": {"type": "object", "properties": {}}
@@ -276,6 +284,10 @@ class ToolRegistry:
             from .scheduler import schedule_one_time
             asyncio.create_task(schedule_one_time(delay_seconds, message))
             return f"Got it! I'll remind you about '{message}' in {delay_minutes} minute(s)."
+
+        elif tool_name == "get_current_time":
+            from datetime import datetime
+            return f"The current server time is: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
 
         elif tool_name == "get_system_metrics":
             try:
