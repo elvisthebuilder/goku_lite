@@ -29,12 +29,15 @@ class CloudAgent:
             "You have full access to a terminal, file system, and long-term cloud memory."
         )
         
+        # Load global personality
+        base += self._get_skill("personality")
+        
         if source == "cli":
-            return base + "\n\n[IDENTITY] You are currently interacting via a Command Line Interface (CLI)."
+            return base + "\n\n[CONTEXT] You are currently interacting via a Command Line Interface (CLI)."
         elif source == "telegram":
-            return base + "\n\n[IDENTITY] You are currently interacting via TELEGRAM." + self._get_skill("telegram_formatting")
+            return base + "\n\n[CONTEXT] You are currently interacting via TELEGRAM." + self._get_skill("telegram_formatting")
         elif source == "whatsapp":
-            return base + "\n\n[IDENTITY] You are currently interacting via WHATSAPP."
+            return base + "\n\n[CONTEXT] You are currently interacting via WHATSAPP."
         
         return base
 
