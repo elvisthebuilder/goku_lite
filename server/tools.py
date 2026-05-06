@@ -76,7 +76,8 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "text": {"type": "string", "description": "The information to remember."}
+                            "text": {"type": "string", "description": "The information to remember."},
+                            "protected": {"type": "boolean", "description": "If true, this memory will NOT be deleted by a standard clear_memory command."}
                         },
                         "required": ["text"]
                     }
@@ -130,8 +131,13 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "clear_memory",
-                    "description": "NUCLEAR OPTION. Wipe all long-term vector memory. This cannot be undone.",
-                    "parameters": {"type": "object", "properties": {}}
+                    "description": "Wipe long-term vector memory. By default, it preserves 'protected' memories.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "delete_protected": {"type": "boolean", "description": "If true, even protected memories will be wiped. Danger!"}
+                        }
+                    }
                 }
             }
         ]
@@ -200,8 +206,9 @@ class ToolRegistry:
 
         elif tool_name == "memory_save":
             text = args.get("text")
-            await memory.add_memory(text)
-            return f"Saved to memory: {text}"
+            protected = args.get("protected", False)
+            await memory.add_memory(text, protected=protected)
+            return f"Saved to memory: {text} (Protected: {protected})"
 
         elif tool_name == "memory_query":
             query = args.get("query")
@@ -231,11 +238,14 @@ class ToolRegistry:
             return "Successfully wiped current chat history. I have forgotten our current conversation."
 
         elif tool_name == "clear_memory":
-            success = await memory.clear_all_memory()
+            delete_protected = args.get("delete_protected", False)
+            success = await memory.clear_all_memory(delete_protected=delete_protected)
             if success:
-                return "Successfully wiped all long-term vector memory. I have forgotten everything I learned in the past."
+                msg = "Successfully wiped memory."
+                if not delete_protected: msg += " I kept your protected memories safe."
+                return msg
             else:
-                return "Failed to clear long-term memory. Is Qdrant configured?"
+                return "Failed to clear long-term memory."
 
         return f"Unknown tool: {tool_name}"
 

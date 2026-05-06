@@ -73,7 +73,7 @@ class CloudMemory:
                 logger.error(f"Embedding failed: {e}")
             return None
 
-    async def add_memory(self, text: str, metadata: dict = None):
+    async def add_memory(self, text: str, metadata: dict = None, protected: bool = False):
         if not self.client: return
         vector = await self._get_embedding(text)
         if not vector: return
@@ -88,12 +88,13 @@ class CloudMemory:
                         payload={
                             "text": text, 
                             "timestamp": time.time(), 
+                            "protected": protected,
                             "metadata": metadata or {}
                         }
                     )
                 ]
             )
-            logger.info("Memory saved to Qdrant Cloud.")
+            logger.info(f"Memory saved to Qdrant Cloud (Protected: {protected}).")
         except Exception as e:
             logger.error(f"Failed to save memory: {e}")
 
@@ -113,13 +114,27 @@ class CloudMemory:
             logger.error(f"Memory search failed: {e}")
             return []
 
-    async def clear_all_memory(self):
-        """Wipes the entire vector collection."""
+    async def clear_all_memory(self, delete_protected: bool = False):
+        """Wipes memory points. If delete_protected is False, only wipes non-protected ones."""
         if not self.client: return False
         try:
-            self.client.delete_collection(collection_name=self.collection_name)
-            self._ensure_collection()
-            logger.info("Memory collection wiped and recreated.")
+            if delete_protected:
+                self.client.delete_collection(collection_name=self.collection_name)
+                self._ensure_collection()
+            else:
+                # Delete only where protected is not true
+                self.client.delete(
+                    collection_name=self.collection_name,
+                    points_selector=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="protected",
+                                match=models.MatchValue(value=False)
+                            )
+                        ]
+                    )
+                )
+            logger.info("Memory points wiped (selective).")
             return True
         except Exception as e:
             logger.error(f"Failed to clear memory: {e}")
