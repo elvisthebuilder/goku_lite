@@ -1,17 +1,19 @@
 import os
 import asyncio
 import questionary
+import sys
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from sqlalchemy import create_engine
 from qdrant_client import QdrantClient
-import httpx
+from dotenv import load_dotenv
 
 console = Console()
 
 def save_to_env(key, value):
-    env_path = ".env"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(base_dir, ".env")
     lines = []
     if os.path.exists(env_path):
         with open(env_path, "r") as f:
@@ -20,7 +22,7 @@ def save_to_env(key, value):
     new_lines = []
     found = False
     for line in lines:
-        if line.startswith(f"{key}="):
+        if line.strip().startswith(f"{key}="):
             new_lines.append(f"{key}={value}\n")
             found = True
         else:
@@ -34,7 +36,6 @@ def save_to_env(key, value):
             f.writelines(new_lines)
     except PermissionError:
         print(f"❌ Error: Permission denied to write to {env_path}")
-        print(f"💡 Try running: sudo chown -R $USER:$USER {os.path.dirname(os.path.abspath(env_path))}")
         sys.exit(1)
 
 async def test_db(url):
@@ -55,14 +56,13 @@ async def test_qdrant(url, key):
         console.print(f"[red]Qdrant Connection Failed:[/] {e}")
         return False
 
-async def main():
-    console.print(Panel("[bold dragon]🐉 Goku Lite: Comprehensive Cloud Onboarding[/]\nConfigure your Elite Agent's Cloud Infrastructure.", border_style="orange3"))
+# --- Modular Setup Functions ---
 
-    # 1. AI Brain (LLM)
+async def setup_llm():
     console.print("\n[bold cyan]1. AI Brain Configuration[/]")
     provider = await questionary.select(
         "Choose your Cloud AI Provider:",
-        choices=["OpenAI", "Anthropic", "Gemini", "Ollama (Remote)"]
+        choices=["OpenAI", "Anthropic", "Gemini", "Ollama (Cloud/Remote)"]
     ).ask_async()
 
     if provider == "OpenAI":
@@ -73,63 +73,60 @@ async def main():
         key = await questionary.password("Enter Google/Gemini API Key:").ask_async()
         save_to_env("GEMINI_API_KEY", key)
         save_to_env("GOKU_MODEL", "gemini/gemini-2.5-flash")
-        console.print("[yellow]💡 Note: Gemini enables Native Google Search for real-time facts.[/]")
     elif provider == "Anthropic":
         key = await questionary.password("Enter Anthropic API Key:").ask_async()
         save_to_env("ANTHROPIC_API_KEY", key)
         save_to_env("GOKU_MODEL", "claude-3-haiku-20240307")
-    elif provider == "Ollama (Remote)":
-        url = await questionary.text("Enter Ollama Base URL:", default="http://localhost:11434").ask_async()
+    elif provider == "Ollama (Cloud/Remote)":
+        url = await questionary.text(
+            "Enter Ollama API Endpoint (Base URL):", 
+            default="https://ollama.com/api",
+            instruction="Tip: Use https://ollama.com/api for Ollama Cloud."
+        ).ask_async()
         key = await questionary.password("Enter API Key (Optional):").ask_async()
-        model = await questionary.text("Enter Ollama Model Name:", default="llama3").ask_async()
+        model = await questionary.text("Enter Ollama Model Name:", default="ollama/gpt-oss:120b-cloud").ask_async()
         save_to_env("OLLAMA_API_BASE", url)
         if key: save_to_env("OLLAMA_API_KEY", key)
-        save_to_env("GOKU_MODEL", f"ollama/{model}")
+        save_to_env("GOKU_MODEL", model)
 
-    # 2. Database (PostgreSQL)
+async def setup_database():
     console.print("\n[bold cyan]2. Database Configuration (History/Logs)[/]")
-    if await questionary.confirm("Configure External SQL Database? (Recommended for cloud)").ask_async():
-        db_url = await questionary.text("Enter PostgreSQL URL:").ask_async()
-        if db_url:
-            with console.status("Testing Database..."):
-                if await test_db(db_url):
-                    console.print("[green]✅ Database Linked![/]")
+    db_url = await questionary.text("Enter PostgreSQL URL:").ask_async()
+    if db_url:
+        with console.status("Testing Database..."):
+            if await test_db(db_url):
+                console.print("[green]✅ Database Linked![/]")
+                save_to_env("DATABASE_URL", db_url)
+            else:
+                if await questionary.confirm("Failed. Save anyway?").ask_async():
                     save_to_env("DATABASE_URL", db_url)
-                else:
-                    if await questionary.confirm("Failed. Save anyway?").ask_async():
-                        save_to_env("DATABASE_URL", db_url)
 
-    # 3. Memory (Qdrant Cloud)
+async def setup_memory():
     console.print("\n[bold cyan]3. Long-Term Memory (Vector DB)[/]")
-    if await questionary.confirm("Configure Qdrant Cloud Memory?").ask_async():
-        q_url = await questionary.text("Enter Qdrant URL:").ask_async()
-        q_key = await questionary.password("Enter Qdrant API Key:").ask_async()
-        if q_url and q_key:
-            with console.status("Testing Qdrant..."):
-                if await test_qdrant(q_url, q_key):
-                    console.print("[green]✅ Memory Linked![/]")
-                    save_to_env("QDRANT_URL", q_url)
-                    save_to_env("QDRANT_API_KEY", q_key)
+    q_url = await questionary.text("Enter Qdrant URL:").ask_async()
+    q_key = await questionary.password("Enter Qdrant API Key:").ask_async()
+    if q_url and q_key:
+        with console.status("Testing Qdrant..."):
+            if await test_qdrant(q_url, q_key):
+                console.print("[green]✅ Memory Linked![/]")
+                save_to_env("QDRANT_URL", q_url)
+                save_to_env("QDRANT_API_KEY", q_key)
 
-    # 4. Search (Tavily)
-    console.print("\n[bold cyan]4. Web Search Configuration[/]")
+async def setup_search_voice():
+    console.print("\n[bold cyan]4. Web Search & Voice[/]")
     t_key = await questionary.password("Enter Tavily API Key (Optional):").ask_async()
-    if t_key:
-        save_to_env("TAVILY_API_KEY", t_key)
-
-    # 5. Voice (ElevenLabs)
-    console.print("\n[bold cyan]5. Voice Synthesis (ElevenLabs)[/]")
+    if t_key: save_to_env("TAVILY_API_KEY", t_key)
+    
     e_key = await questionary.password("Enter ElevenLabs API Key (Optional):").ask_async()
     if e_key:
         save_to_env("ELEVENLABS_API_KEY", e_key)
         v_id = await questionary.text("Enter Voice ID (Default: Adam):", default="pNInz6obpg8ndclK7BJb").ask_async()
         save_to_env("ELEVENLABS_VOICE_ID", v_id)
 
-    # 6. Messaging Channels
-    console.print("\n[bold cyan]6. Messaging Channels[/]")
+async def setup_channels():
+    console.print("\n[bold cyan]5. Messaging Channels[/]")
     tg_token = await questionary.text("Enter Telegram Bot Token (Optional):").ask_async()
-    if tg_token:
-        save_to_env("TELEGRAM_BOT_TOKEN", tg_token)
+    if tg_token: save_to_env("TELEGRAM_BOT_TOKEN", tg_token)
     
     if await questionary.confirm("Enable WhatsApp Bot?").ask_async():
         save_to_env("ENABLE_WHATSAPP", "True")
@@ -137,16 +134,63 @@ async def main():
         save_to_env("ENABLE_WHATSAPP", "False")
     
     owner_id = await questionary.text("Enter Owner ID (For Exclusive Access):").ask_async()
-    if owner_id:
-        save_to_env("GOKU_OWNER_ID", owner_id)
+    if owner_id: save_to_env("GOKU_OWNER_ID", owner_id)
 
-    # 7. Security
-    console.print("\n[bold cyan]7. Security Configuration[/]")
+async def setup_security():
+    console.print("\n[bold cyan]6. Security Configuration[/]")
     s_key = await questionary.password("Enter API Secret Key (To secure your Web API):").ask_async()
-    if s_key:
-        save_to_env("API_SECRET_KEY", s_key)
+    if s_key: save_to_env("API_SECRET_KEY", s_key)
 
-    console.print(Panel("[bold green]✨ All Cloud Systems Go![/]\nGoku Lite is now fully synchronized and ready for production.", border_style="green"))
+# --- Main Application Logic ---
+
+async def main():
+    console.print(Panel("[bold dragon]🐉 Goku Lite: Cloud Control Center[/]\nManage your Elite Agent's Infrastructure.", border_style="orange3"))
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(base_dir, ".env")
+    
+    if os.path.exists(env_path):
+        # Existing Config Menu
+        choice = await questionary.select(
+            "What would you like to update?",
+            choices=[
+                "🧠 AI Brain (LLM / Ollama Cloud)",
+                "💾 Database (SQL History)",
+                "🧠 Memory (Qdrant Cloud)",
+                "🌐 Web Search & Voice (Tavily/ElevenLabs)",
+                "💬 Messaging Channels (Telegram/WhatsApp)",
+                "🔒 Security (API Secret)",
+                "✨ Full Re-Setup",
+                "❌ Exit"
+            ]
+        ).ask_async()
+
+        if choice == "🧠 AI Brain (LLM / Ollama Cloud)": await setup_llm()
+        elif choice == "💾 Database (SQL History)": await setup_database()
+        elif choice == "🧠 Memory (Qdrant Cloud)": await setup_memory()
+        elif choice == "🌐 Web Search & Voice (Tavily/ElevenLabs)": await setup_search_voice()
+        elif choice == "💬 Messaging Channels (Telegram/WhatsApp)": await setup_channels()
+        elif choice == "🔒 Security (API Secret)": await setup_security()
+        elif choice == "✨ Full Re-Setup":
+            await setup_llm()
+            await setup_database()
+            await setup_memory()
+            await setup_search_voice()
+            await setup_channels()
+            await setup_security()
+        elif choice == "❌ Exit":
+            sys.exit(0)
+    else:
+        # First Time Setup
+        console.print("[yellow]No configuration found. Starting Full Onboarding...[/]")
+        await setup_llm()
+        await setup_database()
+        await setup_memory()
+        await setup_search_voice()
+        await setup_channels()
+        await setup_security()
+
+    console.print(Panel("[bold green]✨ Settings Synchronized![/]\nGoku Lite is updated and ready for action.", border_style="green"))
 
 if __name__ == "__main__":
     asyncio.run(main())
