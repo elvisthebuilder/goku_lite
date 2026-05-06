@@ -1,29 +1,31 @@
 #!/bin/bash
 
-# 🐉 Goku Lite Installer
+# 🐉 Goku Lite Installer v1.0.2
 # Built by Elvis The Builder
 
 set -e
 
-echo "🐉 Goku Lite: Starting Elite Installation..."
+echo "🐉 Goku Lite [v1.0.2]: Starting Elite Installation..."
 
-# 1. System Dependencies
+# 1. System Dependencies (Force install at top)
 echo "🛠️  Installing System Dependencies (python3-venv, ffmpeg, git)..."
-sudo apt update
-sudo apt install -y python3-venv ffmpeg git python3-pip
+sudo apt-get update
+sudo apt-get install -y python3-venv ffmpeg git python3-pip
 
 # 2. Setup Directory
 INSTALL_DIR="/opt/goku-lite"
 echo "📂 Installing to $INSTALL_DIR..."
 sudo mkdir -p $INSTALL_DIR
 
-# If we are running from the curl pipe, we need to clone the repo
-if [ ! -d ".git" ]; then
-    echo "📥 Cloning Goku Lite from GitHub..."
+# Clone fresh if needed
+if [ ! -d "$INSTALL_DIR/.git" ]; then
+    echo "📥 Cloning fresh from GitHub..."
     sudo rm -rf $INSTALL_DIR/*
     sudo git clone https://github.com/elvisthebuilder/goku_lite.git $INSTALL_DIR
 else
-    sudo cp -r . $INSTALL_DIR
+    echo "🔄 Updating existing installation..."
+    cd $INSTALL_DIR
+    sudo git pull origin main
 fi
 
 sudo chown -R $USER:$USER $INSTALL_DIR
@@ -31,12 +33,12 @@ cd $INSTALL_DIR
 
 # 3. Virtual Environment
 echo "🐍 Setting up Virtual Environment..."
-python3 -m venv venv || {
-    echo "⚠️  Standard venv failed. Trying version-specific venv..."
-    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    sudo apt install -y "python$PYTHON_VERSION-venv"
-    python3 -m venv venv
-}
+# Check for specific python version to ensure venv works
+PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "Detected Python $PY_VER. Ensuring python3.$PY_VER-venv..."
+sudo apt-get install -y "python3.$PY_VER-venv" || sudo apt-get install -y python3-venv
+
+python3 -m venv venv
 source venv/bin/activate
 
 # 4. Dependencies
@@ -70,7 +72,6 @@ sudo systemctl enable goku-lite || true
 # 6. Create Global Commands
 echo "🚀 Creating Global Commands..."
 
-# Helper to create global script
 create_global_cmd() {
     local cmd_name=$1
     local script_name=$2
@@ -113,7 +114,7 @@ EOF
 
 sudo chmod +x /usr/local/bin/goku-lite*
 
-echo "✨ Goku Lite Installation Complete!"
+echo "✨ Goku Lite [v1.0.2] Installation Complete!"
 echo "------------------------------------------------"
 echo "🐉 Setup:    goku-lite-setup"
 echo "🐉 Start:    goku-lite-start"
