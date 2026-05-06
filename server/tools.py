@@ -137,6 +137,21 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "update_briefing_time",
+                    "description": "Change the time of the daily morning briefing. Use this when the user asks to be texted at a different time.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "hour": {"type": "integer", "description": "The hour (0-23) in UTC."},
+                            "minute": {"type": "integer", "description": "The minute (0-59)."}
+                        },
+                        "required": ["hour", "minute"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "clear_history",
                     "description": "Wipe the current conversation history. Use this if the user wants to start a fresh chat or forget the current context.",
                     "parameters": {"type": "object", "properties": {}}
@@ -253,6 +268,45 @@ class ToolRegistry:
             from .scheduler import schedule_one_time
             asyncio.create_task(schedule_one_time(delay_seconds, message))
             return f"Got it! I'll remind you about '{message}' in {delay_minutes} minute(s)."
+
+        elif tool_name == "update_briefing_time":
+            hour = args.get("hour")
+            minute = args.get("minute")
+            
+            # 1. Update live scheduler
+            from .scheduler import set_briefing_time
+            set_briefing_time(hour, minute)
+            
+            # 2. Persist to .env
+            try:
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                env_path = os.path.join(base_dir, ".env")
+                
+                with open(env_path, "r") as f:
+                    lines = f.readlines()
+                
+                new_lines = []
+                found_h = False
+                found_m = False
+                for line in lines:
+                    if line.startswith("BRIEFING_HOUR="):
+                        new_lines.append(f"BRIEFING_HOUR={hour}\n")
+                        found_h = True
+                    elif line.startswith("BRIEFING_MINUTE="):
+                        new_lines.append(f"BRIEFING_MINUTE={minute}\n")
+                        found_m = True
+                    else:
+                        new_lines.append(line)
+                
+                if not found_h: new_lines.append(f"BRIEFING_HOUR={hour}\n")
+                if not found_m: new_lines.append(f"BRIEFING_MINUTE={minute}\n")
+                
+                with open(env_path, "w") as f:
+                    f.writelines(new_lines)
+                    
+                return f"I've updated my morning briefing to {hour:02d}:{minute:02d} UTC. I've also saved this to my configuration so I'll remember it after a restart!"
+            except Exception as e:
+                return f"I've updated the timer for now, but I couldn't save it to my config file: {e}"
 
         elif tool_name == "clear_history":
             if not session_id: return "Error: No session ID provided."

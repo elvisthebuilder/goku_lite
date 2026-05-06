@@ -68,6 +68,17 @@ async def schedule_one_time(delay_seconds: int, message: str):
     await asyncio.sleep(delay_seconds)
     await _push_message(f"⏰ *Reminder:* {message}")
 
+def set_briefing_time(hour: int, minute: int):
+    """Update the morning briefing schedule live."""
+    if scheduler.running:
+        scheduler.reschedule_job(
+            "morning_briefing",
+            trigger=CronTrigger(hour=hour, minute=minute)
+        )
+        logger.info(f"📅 Morning briefing rescheduled to {hour:02d}:{minute:02d} UTC.")
+        return True
+    return False
+
 def start_scheduler(briefing_hour: int = 8, briefing_minute: int = 0):
     """Start the background scheduler for proactive tasks."""
     if scheduler.running:
