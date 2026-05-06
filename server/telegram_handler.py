@@ -4,7 +4,7 @@ import os
 import tempfile
 from collections import defaultdict
 from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 from .agent import agent
 from .config import config
 from .history import history
@@ -20,6 +20,52 @@ _user_message_buffers: dict = defaultdict(list)
 _user_locks: dict = defaultdict(asyncio.Lock)
 
 DEBOUNCE_SECONDS = 2.5  # Wait this long after last message before processing
+
+async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle official bot commands."""
+    if not update.message:
+        return
+
+    command = update.message.text.split()[0].lower()
+    chat_id = str(update.message.chat_id)
+    session_id = f"tg_{chat_id}"
+
+    # Security check
+    owner_id = os.getenv("GOKU_OWNER_ID")
+    if owner_id and chat_id != owner_id:
+        await update.message.reply_text("⚠️ Unauthorized.")
+        return
+
+    if command == "/start":
+        await update.message.reply_text("🐉 *Link Established.*\nI am awake and monitoring your systems. Speak when you're ready.", parse_mode="Markdown")
+    
+    elif command == "/new":
+        history.clear_session(session_id)
+        await update.message.reply_text("🧼 *Context Cleared.*\nI've wiped our recent history. I'm ready to read myself into being again.", parse_mode="Markdown")
+    
+    elif command == "/status":
+        await update.message.reply_text("🔍 *Health Check Initiated...*", parse_mode="Markdown")
+        from .scheduler import _health_check
+        await _health_check()
+    
+    elif command == "/briefing":
+        await update.message.reply_text("📊 *Generating Briefing...*", parse_mode="Markdown")
+        from .scheduler import _morning_briefing
+        await _morning_briefing()
+    
+    elif command == "/help":
+        help_text = (
+            "🐉 *Goku Command Center*\n\n"
+            "/start - Initialize connection\n"
+            "/new - Clear current chat history\n"
+            "/status - Live system health check\n"
+            "/briefing - Trigger daily report\n"
+            "/help - Show this menu"
+        )
+        await update.message.reply_text(help_text, parse_mode="Markdown")
+
+def split_message(text, limit=4000):
+# ... (rest of the functions stay the same)
 
 def split_message(text, limit=4000):
     """Split a message into chunks within Telegram's character limit."""
@@ -213,10 +259,14 @@ async def start_telegram_bot():
         application = ApplicationBuilder().token(token).build()
         _bot_instance = application.bot
 
+        # Add Command Handlers
+        application.add_handler(CommandHandler(["start", "new", "status", "briefing", "help"], handle_command))
+        
+        # Add Message Handlers
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
         application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-        logger.info("🐉 Goku Lite: Telegram bot initialized with Smart Queue + Document Vision...")
+        logger.info("🐉 Goku: Telegram bot initialized with Commands + Smart Queue...")
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
