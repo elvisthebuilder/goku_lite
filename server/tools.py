@@ -122,6 +122,21 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "remind_me",
+                    "description": "Schedule a reminder to be sent to the user after a delay. Use this when the user asks to be reminded about something.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "message": {"type": "string", "description": "The reminder message to send."},
+                            "delay_minutes": {"type": "integer", "description": "How many minutes from now to send the reminder."}
+                        },
+                        "required": ["message", "delay_minutes"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "clear_history",
                     "description": "Wipe the current conversation history. Use this if the user wants to start a fresh chat or forget the current context.",
                     "parameters": {"type": "object", "properties": {}}
@@ -230,6 +245,14 @@ class ToolRegistry:
                 return result.text_content
             except Exception as e:
                 return f"Google Search failed: {e}"
+
+        elif tool_name == "remind_me":
+            message = args.get("message")
+            delay_minutes = args.get("delay_minutes", 5)
+            delay_seconds = delay_minutes * 60
+            from .scheduler import schedule_one_time
+            asyncio.create_task(schedule_one_time(delay_seconds, message))
+            return f"Got it! I'll remind you about '{message}' in {delay_minutes} minute(s)."
 
         elif tool_name == "clear_history":
             if not session_id: return "Error: No session ID provided."

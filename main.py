@@ -58,10 +58,15 @@ async def start_gateway():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start the background gateway
+    # Startup: Start scheduler and background gateway
+    from server.scheduler import start_scheduler
+    briefing_hour = int(os.getenv("BRIEFING_HOUR", "8"))
+    briefing_minute = int(os.getenv("BRIEFING_MINUTE", "0"))
+    start_scheduler(briefing_hour=briefing_hour, briefing_minute=briefing_minute)
+    
     gateway_task = asyncio.create_task(start_gateway())
     yield
-    # Shutdown: Cancel the gateway task
+    # Shutdown
     gateway_task.cancel()
     try:
         await gateway_task
