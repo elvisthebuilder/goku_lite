@@ -8,12 +8,28 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
+def split_message(text, limit=4000):
+    """Split a message into chunks within Telegram's character limit."""
+    chunks = []
+    while len(text) > limit:
+        # Find the last newline within the limit to avoid splitting words/markdown
+        split_at = text.rfind("\n", 0, limit)
+        if split_at == -1:
+            split_at = limit
+        
+        chunks.append(text[:split_at].strip())
+        text = text[split_at:].strip()
+    
+    if text:
+        chunks.append(text)
+    return chunks
+
 async def keep_typing(context, chat_id, stop_event):
     """Pulsing typing indicator to keep it alive during long AI thinking."""
     while not stop_event.is_set():
         try:
             await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-            await asyncio.sleep(4) # Telegram typing lasts ~5 seconds
+            await asyncio.sleep(4)
         except:
             break
 
@@ -27,12 +43,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"📩 Telegram incoming: [{username}] ({chat_id}): {user_text}")
     
-    # Check if it's a private chat or if the bot is mentioned
     is_private = update.message.chat.type == "private"
     bot_username = context.bot.username
     is_mention = (bot_username in user_text) if bot_username else False
     
-    # Also check for GOKU_OWNER_ID if set
     owner_id = os.getenv("GOKU_OWNER_ID")
     if owner_id and chat_id != owner_id and is_private:
         logger.warning(f"🚫 Unauthorized access attempt from {chat_id}")
@@ -40,42 +54,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if is_private or is_mention:
-        # 1. Start continuous typing pulse immediately
         stop_typing = asyncio.Event()
         typing_task = asyncio.create_task(keep_typing(context, chat_id, stop_typing))
         
         try:
-            # 2. "Human Pause": Small delay to simulate reading
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(1.2) # Reading pause
             
             logger.info(f"🤖 Goku is thinking for {chat_id}...")
             
-            # 3. Get Response with a timeout
             response = await asyncio.wait_for(
                 agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram"),
                 timeout=90
             )
             
-            # 4. "Closing Pause": Let the typing indicator linger a tiny bit
-            await asyncio.sleep(0.5)
-            
-            # 5. Stop typing before sending
+            await asyncio.sleep(0.5) # Closing pause
             stop_typing.set()
+            await typing_task
+            
             if response:
-                try:
-                    # Try sending with Markdown
-                    await update.message.reply_text(response, parse_mode="Markdown")
-                except Exception as parse_err:
-                    logger.warning(f"⚠️ Markdown parsing failed, falling back to plain text: {parse_err}")
-                    # Fallback to plain text if Markdown is broken
-                    await update.message.reply_text(response)
+                # Split response into safe chunks for Telegram
+                chunks = split_message(response)
+                for chunk in chunks:
+                    try:
+                        await update.message.reply_text(chunk, parse_mode="Markdown")
+                    except Exception as parse_err:
+                        logger.warning(f"⚠️ Markdown chunk failed, falling back to plain: {parse_err}")
+                        await update.message.reply_text(chunk)
+                    
+                    # Small delay between chunks to keep order and prevent rate limits
+                    if len(chunks) > 1:
+                        await asyncio.sleep(0.3)
             else:
                 await update.message.reply_text("I heard you, but I couldn't formulate a response. Try again?")
                 
         except asyncio.TimeoutError:
             stop_typing.set()
             logger.error(f"⏱️ Cloud timeout for {chat_id}")
-            await update.message.reply_text("⏳ The cloud brain is taking too long to respond. Please try again in a moment.")
+            await update.message.reply_text("⏳ The cloud brain is taking too long to respond. Please try again.")
         except Exception as e:
             stop_typing.set()
             logger.error(f"❌ Telegram Error: {e}")
@@ -94,8 +109,6 @@ async def start_telegram_bot():
 
     try:
         application = ApplicationBuilder().token(token).build()
-        
-        # Add handler for all text messages
         text_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
         application.add_handler(text_handler)
 
