@@ -1,12 +1,30 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
-from server.agent import agent
-from server.config import config
-from server.telegram_handler import start_telegram_bot
-from server.whatsapp_handler import start_whatsapp_bot
 import uvicorn
 import asyncio
 import logging
 import os
+import sys
+import subprocess
+
+# Guard: Ensure configuration exists before loading other modules
+env_path = os.path.join(os.getcwd(), ".env")
+if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
+    print("🐉 Goku Lite: Missing configuration. Launching Onboarding Wizard...")
+    try:
+        # Run setup.py and wait for it to finish
+        subprocess.run([sys.executable, "setup.py"], check=True)
+        # Reload environment variables after setup
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except Exception as e:
+        print(f"❌ Failed to launch onboarding: {e}")
+        sys.exit(1)
+
+# Now we can safely import components that depend on config
+from server.agent import agent
+from server.config import config
+from server.telegram_handler import start_telegram_bot
+from server.whatsapp_handler import start_whatsapp_bot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("GokuLite")

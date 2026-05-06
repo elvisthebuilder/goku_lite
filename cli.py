@@ -1,4 +1,20 @@
+import os
+import sys
+import subprocess
 import asyncio
+
+# Guard: Ensure configuration exists
+env_path = os.path.join(os.getcwd(), ".env")
+if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
+    print("🐉 Goku Lite: Missing configuration. Launching Onboarding Wizard...")
+    try:
+        subprocess.run([sys.executable, "setup.py"], check=True)
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except Exception as e:
+        print(f"❌ Setup failed: {e}")
+        sys.exit(1)
+
 from server.agent import agent
 from server.config import config
 from rich.console import Console
