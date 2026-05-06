@@ -7,24 +7,36 @@ set -e
 
 echo "🐉 Goku Lite: Starting Elite Installation..."
 
-# 1. System Check
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Error: Python 3 is not installed."
-    exit 1
-fi
+# 1. System Dependencies
+echo "🛠️  Installing System Dependencies (python3-venv, ffmpeg, git)..."
+sudo apt update
+sudo apt install -y python3-venv ffmpeg git python3-pip
 
 # 2. Setup Directory
 INSTALL_DIR="/opt/goku-lite"
 echo "📂 Installing to $INSTALL_DIR..."
 sudo mkdir -p $INSTALL_DIR
-sudo cp -r . $INSTALL_DIR
-sudo chown -R $USER:$USER $INSTALL_DIR
 
+# If we are running from the curl pipe, we need to clone the repo
+if [ ! -d ".git" ]; then
+    echo "📥 Cloning Goku Lite from GitHub..."
+    sudo rm -rf $INSTALL_DIR/*
+    sudo git clone https://github.com/elvisthebuilder/goku_lite.git $INSTALL_DIR
+else
+    sudo cp -r . $INSTALL_DIR
+fi
+
+sudo chown -R $USER:$USER $INSTALL_DIR
 cd $INSTALL_DIR
 
 # 3. Virtual Environment
 echo "🐍 Setting up Virtual Environment..."
-python3 -m venv venv
+python3 -m venv venv || {
+    echo "⚠️  Standard venv failed. Trying version-specific venv..."
+    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    sudo apt install -y "python$PYTHON_VERSION-venv"
+    python3 -m venv venv
+}
 source venv/bin/activate
 
 # 4. Dependencies
@@ -58,52 +70,42 @@ sudo systemctl enable goku-lite || true
 # 6. Create Global Commands
 echo "🚀 Creating Global Commands..."
 
-# goku-lite (Direct foreground run)
-cat <<EOF | sudo tee /usr/local/bin/goku-lite > /dev/null
+# Helper to create global script
+create_global_cmd() {
+    local cmd_name=$1
+    local script_name=$2
+    cat <<EOF | sudo tee /usr/local/bin/$cmd_name > /dev/null
 #!/bin/bash
 cd $INSTALL_DIR
 source venv/bin/activate
-python3 main.py "\$@"
+python3 $script_name "\$@"
 EOF
+    sudo chmod +x /usr/local/bin/$cmd_name
+}
 
-# goku-lite-cli (The CLI Chat)
-cat <<EOF | sudo tee /usr/local/bin/goku-lite-cli > /dev/null
-#!/bin/bash
-cd $INSTALL_DIR
-source venv/bin/activate
-python3 cli.py "\$@"
-EOF
+create_global_cmd "goku-lite" "main.py"
+create_global_cmd "goku-lite-cli" "cli.py"
+create_global_cmd "goku-lite-setup" "setup.py"
 
-# goku-lite-setup (The Onboarding Wizard)
-cat <<EOF | sudo tee /usr/local/bin/goku-lite-setup > /dev/null
-#!/bin/bash
-cd $INSTALL_DIR
-source venv/bin/activate
-python3 setup.py
-EOF
-
-# goku-lite-start (Start Background)
+# Management Helpers
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-start > /dev/null
 #!/bin/bash
 sudo systemctl start goku-lite
 echo "🐉 Goku Lite is now active in the background."
 EOF
 
-# goku-lite-stop (Stop Background)
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-stop > /dev/null
 #!/bin/bash
 sudo systemctl stop goku-lite
 echo "🛑 Goku Lite has been stopped."
 EOF
 
-# goku-lite-restart (Restart Background)
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-restart > /dev/null
 #!/bin/bash
 sudo systemctl restart goku-lite
 echo "🔄 Goku Lite has been restarted."
 EOF
 
-# goku-lite-logs (Watch Logs)
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-logs > /dev/null
 #!/bin/bash
 sudo journalctl -u goku-lite -f
