@@ -55,8 +55,15 @@ class CloudAgent:
             elif "gemini" in self.model:
                 api_key = config.GEMINI_API_KEY
             elif "ollama" in self.model:
-                api_key = config.OLLAMA_API_KEY or "ollama" # LiteLLM needs a non-empty key for some providers
+                api_key = config.OLLAMA_API_KEY or "ollama"
                 api_base = config.OLLAMA_API_BASE
+                if api_base:
+                    # Strip trailing /api or /api/generate as LiteLLM adds them
+                    api_base = api_base.rstrip("/")
+                    if api_base.endswith("/api"):
+                        api_base = api_base[:-4]
+                    if api_base.endswith("/api/generate"):
+                        api_base = api_base[:-13]
             
             # Fallback to general keys if still None
             if not api_key:

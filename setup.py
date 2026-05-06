@@ -80,8 +80,8 @@ async def setup_llm():
     elif provider == "Ollama (Cloud/Remote)":
         url = await questionary.text(
             "Enter Ollama API Endpoint (Base URL):", 
-            default="https://ollama.com/api",
-            instruction="Tip: Use https://ollama.com/api for Ollama Cloud."
+            default="https://ollama.com",
+            instruction="Tip: Use https://ollama.com for Ollama Cloud (I'll handle the /api part)."
         ).ask_async()
         key = await questionary.password("Enter API Key (Optional):").ask_async()
         model = await questionary.text("Enter Ollama Model Name:", default="ollama/gpt-oss:120b-cloud").ask_async()
