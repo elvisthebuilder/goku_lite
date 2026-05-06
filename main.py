@@ -92,6 +92,15 @@ async def chat(text: str, session_id: str = "default"):
     response = await agent.chat(text, session_id)
     return {"response": response}
 
+@app.post("/notify", dependencies=[Depends(verify_token)])
+async def notify(chat_id: str, message: str):
+    """Proactively send a message to a Telegram user without them texting first."""
+    from server.telegram_handler import send_proactive_message
+    success = await send_proactive_message(chat_id=chat_id, text=message)
+    if success:
+        return {"status": "sent", "chat_id": chat_id}
+    raise HTTPException(status_code=503, detail="Could not send message. Is Telegram bot running?")
+
 if __name__ == "__main__":
     config.validate()
     # Run the web API (Lifespan handles the gateway)
