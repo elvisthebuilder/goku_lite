@@ -43,10 +43,27 @@ class CloudMemory:
     async def _get_embedding(self, text: str):
         """Fetch embedding from cloud provider."""
         try:
+            # Determine provider and model
+            model = "text-embedding-3-small" # Default
+            api_key = config.OPENAI_API_KEY
+            
+            if config.GEMINI_API_KEY and not api_key:
+                model = "gemini/text-embedding-004"
+                api_key = config.GEMINI_API_KEY
+            elif "ollama" in config.GOKU_MODEL.lower():
+                # If using Ollama, try to use a common embedding model
+                model = "ollama/mxbai-embed-large"
+                api_key = config.OLLAMA_API_KEY or "ollama"
+
+            if not api_key and not config.OPENAI_API_KEY:
+                logger.warning("No API Key found for embeddings. Memory will be disabled for this turn.")
+                return None
+
             resp = await litellm.aembedding(
-                model="text-embedding-3-small",
+                model=model,
                 input=[text],
-                api_key=config.OPENAI_API_KEY or config.GEMINI_API_KEY
+                api_key=api_key,
+                api_base=config.OLLAMA_API_BASE if "ollama" in model else None
             )
             return resp.data[0]['embedding']
         except Exception as e:
