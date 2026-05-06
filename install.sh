@@ -78,7 +78,9 @@ EOF
 
 create_global_cmd "goku-lite" "main.py"
 create_global_cmd "goku-lite-cli" "cli.py"
+create_global_cmd "goku" "cli.py"
 create_global_cmd "goku-lite-setup" "setup.py"
+create_global_cmd "goku-lite-wizard" "setup.py"
 
 # Management Helpers
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-start > /dev/null
