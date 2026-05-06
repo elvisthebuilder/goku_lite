@@ -13,53 +13,63 @@ class CloudAgent:
     def __init__(self):
         self.model = config.GOKU_MODEL
 
-    def _get_soul(self):
-        """Load the core SOUL.md from the root directory."""
+    def _load_file(self, filename: str) -> str:
+        """Load a file from the root directory."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        soul_path = os.path.join(base_dir, "SOUL.md")
-        if os.path.exists(soul_path):
-            with open(soul_path, "r") as f:
-                return f"\n\n{f.read()}"
+        file_path = os.path.join(base_dir, filename)
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                return f"\n\n## {filename}\n{f.read()}"
         return ""
 
-    def _get_skill(self, skill_name: str):
-        """Load a skill from the skills directory."""
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        skill_path = os.path.join(base_dir, "skills", f"{skill_name}.md")
-        if os.path.exists(skill_path):
-            with open(skill_path, "r") as f:
-                return f"\n\n{f.read()}"
-        return ""
+    def _get_runtime_info(self) -> str:
+        """Get real-time system metrics for the prompt."""
+        try:
+            import subprocess
+            # Get RAM usage
+            ram = subprocess.check_output("free -h | awk '/^Mem:/ {print $3 \"/\" $2}'", shell=True).decode().strip()
+            # Get Disk usage
+            disk = subprocess.check_output("df -h / | awk 'NR==2 {print $3 \"/\" $2}'", shell=True).decode().strip()
+            # Get uptime
+            uptime = subprocess.check_output("uptime -p", shell=True).decode().strip()
+            
+            return (
+                "\n\n## System Runtime\n"
+                f"- **RAM**: {ram}\n"
+                f"- **Disk**: {disk}\n"
+                f"- **Uptime**: {uptime}\n"
+                "- **Platform**: AWS EC2 (Ubuntu)\n"
+            )
+        except Exception:
+            return ""
 
     def _get_system_prompt(self, source: str):
-        """Generate a source-aware system prompt."""
+        """Generate an OpenClaw-style stacked system prompt."""
         from datetime import datetime
         now_utc = datetime.utcnow().strftime("%A, %B %d, %Y %H:%M:%S UTC")
         
-        base = (
-            f"CURRENT TIME: {now_utc}\n\n"
-            "You have full access to a terminal, file system, and long-term cloud memory."
+        # 1. Core Identity & Time
+        prompt = (
+            "You are a personal assistant running inside Goku Lite (OpenClaw Architecture).\n"
+            f"CURRENT TIME: {now_utc}\n"
         )
         
-        # Load the core SOUL
-        base += self._get_soul()
+        # 2. Inject Context Files (The Stack)
+        prompt += self._load_file("SOUL.md")
+        prompt += self._load_file("AGENTS.md")
+        prompt += self._load_file("USER.md")
+        prompt += self._load_file("TOOLS.md")
         
-        # Load global skills
-        base += self._get_skill("data_presentation")
-        base += self._get_skill("no_hallucination")
-        base += self._get_skill("skill_creator")
-        base += self._get_skill("skill_analyzer")
-        base += self._get_skill("skill_comparator")
-        base += self._get_skill("skill_grader")
+        # 3. Inject Runtime Info
+        prompt += self._get_runtime_info()
         
-        if source == "cli":
-            return base + "\n\n[CONTEXT] You are currently interacting via a Command Line Interface (CLI)."
-        elif source == "telegram":
-            return base + "\n\n[CONTEXT] You are currently interacting via TELEGRAM." + self._get_skill("telegram_formatting")
-        elif source == "whatsapp":
-            return base + "\n\n[CONTEXT] You are currently interacting via WHATSAPP."
-        
-        return base
+        # 4. Inject Channel-Specific Logic
+        if source == "telegram":
+            prompt += "\n\n## Channel: Telegram\n- Use clean Markdown.\n- Keep emojis minimal.\n- Be professional and direct."
+        elif source == "cli":
+            prompt += "\n\n## Channel: CLI\n- You are in a high-power terminal environment."
+            
+        return prompt
 
     async def chat(self, user_input: str, session_id: str = "default", source: str = "cli"):
         # 1. Get history
