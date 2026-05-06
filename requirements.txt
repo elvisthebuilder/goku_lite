@@ -14,5 +14,5 @@ typer
 httpx
 apscheduler
 questionary
-markitdown
+markitdown[all]
 elevenlabs
