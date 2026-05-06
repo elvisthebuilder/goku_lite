@@ -26,8 +26,13 @@ def save_to_env(key, value):
     if not found:
         new_lines.append(f"{key}={value}\n")
     
-    with open(env_path, "w") as f:
-        f.writelines(new_lines)
+    try:
+        with open(env_path, "w") as f:
+            f.writelines(new_lines)
+    except PermissionError:
+        console.print(f"\n[red]❌ Permission Denied:[/] Cannot write to {env_path}")
+        console.print("[yellow]Tip: Try running the command with sudo:[/] [bold]sudo goku-lite-model[/]")
+        sys.exit(1)
 
 def main():
     console.print(Panel("[bold dragon]🐉 Goku Lite: Model Switcher[/]\nQuickly swap your AI Cloud Brain.", border_style="cyan"))
