@@ -19,9 +19,9 @@ class Config:
         self.TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
         self.GOKU_OWNER_ID = os.getenv("GOKU_OWNER_ID")
         
-        # Scheduler defaults
-        self.BRIEFING_HOUR = int(os.getenv("BRIEFING_HOUR", "8"))
-        self.BRIEFING_MINUTE = int(os.getenv("BRIEFING_MINUTE", "0"))
+        # Scheduler defaults (Only managed via goku_settings.json now)
+        self.BRIEFING_HOUR = 8
+        self.BRIEFING_MINUTE = 0
 
         # Load autonomous overrides
         self._load_overrides()
