@@ -9,9 +9,11 @@ echo "🐉 Goku Lite [v1.0.4]: Starting Force Installation..."
 
 # 1. Force Clean State (Required for Production reliability)
 INSTALL_DIR="/opt/goku-lite"
-echo "🧹 Cleaning existing installation at $INSTALL_DIR..."
-# Delete contents but keep the directory to avoid "ghost directory" errors
-sudo find "$INSTALL_DIR" -mindepth 1 -delete || true
+echo "🧹 Cleaning existing installation at $INSTALL_DIR (preserving .env)..."
+# Delete contents but keep the directory AND the .env file
+if [ -d "$INSTALL_DIR" ]; then
+    sudo find "$INSTALL_DIR" -mindepth 1 ! -name ".env" -delete || true
+fi
 
 # 2. System Dependencies
 echo "🛠️  Installing System Dependencies (python3-venv, ffmpeg, git)..."
@@ -19,9 +21,15 @@ sudo apt-get update
 sudo apt-get install -y python3-venv ffmpeg git python3-pip
 
 # 3. Setup Directory & Clone
-echo "📂 Creating directory and cloning fresh from GitHub..."
+echo "📂 Fetching fresh code from GitHub..."
+TEMP_CLONE="/tmp/goku_lite_temp"
+sudo rm -rf "$TEMP_CLONE"
+git clone https://github.com/elvisthebuilder/goku_lite.git "$TEMP_CLONE"
+
+echo "🚚 Syncing files to $INSTALL_DIR..."
 sudo mkdir -p "$INSTALL_DIR"
-sudo git clone https://github.com/elvisthebuilder/goku_lite.git "$INSTALL_DIR"
+sudo cp -rn "$TEMP_CLONE"/. "$INSTALL_DIR"/ # Copy all files including hidden ones
+sudo rm -rf "$TEMP_CLONE"
 
 sudo chown -R $USER:$USER $INSTALL_DIR
 cd $INSTALL_DIR
