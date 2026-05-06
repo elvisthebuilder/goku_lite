@@ -32,12 +32,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_private or is_mention:
         try:
+            # 1. Immediate Acknowledgement: Set typing status
+            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+            
             logger.info(f"🤖 Goku is thinking for {chat_id}...")
+            
+            # 2. Get Response
             response = await agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram")
-            await update.message.reply_text(response)
+            
+            # 3. Send Response with Markdown rendering
+            if response:
+                # Use Markdown (V1) for safe but effective bold/italic rendering
+                await update.message.reply_text(response, parse_mode="Markdown")
+            else:
+                await update.message.reply_text("I heard you, but I couldn't formulate a response. Try again?")
+                
         except Exception as e:
             logger.error(f"❌ Telegram Error: {e}")
-            await update.message.reply_text("📦 Sorry, I hit a snag while thinking. Please try again.")
+            # Fallback without markdown if rendering fails
+            try:
+                await update.message.reply_text("📦 Sorry, I hit a snag while thinking. Please try again.")
+            except: pass
 
 async def start_telegram_bot():
     token = config.TELEGRAM_BOT_TOKEN
