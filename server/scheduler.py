@@ -20,22 +20,40 @@ async def _push_message(message: str):
     await send_proactive_message(chat_id=owner_id, text=message)
 
 async def _morning_briefing():
-    """Send a daily morning briefing."""
+    """Send a daily morning briefing with system stats."""
     from .config import config
+    import subprocess
+    
     now = datetime.utcnow().strftime("%A, %B %d, %Y")
     db_status = "✅ Connected" if config.DATABASE_URL else "⚠️ Local"
     mem_status = "✅ Active" if config.QDRANT_API_KEY else "⚠️ Disabled"
     model = config.GOKU_MODEL or "Unknown"
 
+    # Fetch System Stats
+    ram_info = "Unknown"
+    disk_info = "Unknown"
+    try:
+        # RAM
+        free = subprocess.check_output(["free", "-m"]).decode().split("\n")[1].split()
+        ram_info = f"{free[2]}MB / {free[1]}MB used"
+        # Disk
+        df = subprocess.check_output(["df", "-h", "/"]).decode().split("\n")[1].split()
+        disk_info = f"{df[2]} / {df[1]} used ({df[4]})"
+    except Exception:
+        pass
+
     msg = (
-        f"🌅 *Good morning!* It's {now} and I'm up and running.\n\n"
-        f"Here's a quick look at how things are doing:\n"
-        f"• *Brain:* {model}\n"
+        f"🌅 *Good morning!* It's {now}.\n\n"
+        f"🛡️ *System Health:*\n"
+        f"• *RAM:* {ram_info}\n"
+        f"• *Disk:* {disk_info}\n\n"
+        f"🧠 *Brain Status:*\n"
+        f"• *Model:* {model}\n"
         f"• *Database:* {db_status}\n"
         f"• *Memory Cloud:* {mem_status}\n\n"
-        f"I'm ready when you are! Just say the word. 🐉"
+        f"Everything is looking sharp. I'm ready for orders! 🐉"
     )
-    logger.info("📤 Sending morning briefing...")
+    logger.info("📤 Sending morning briefing with system metrics...")
     await _push_message(msg)
 
 async def _health_check():
