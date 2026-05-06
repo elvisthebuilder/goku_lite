@@ -2,7 +2,9 @@ import os
 import httpx
 import logging
 import subprocess
+import time
 from .memory import memory
+from .config import config
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +15,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "web_search",
-                    "description": "PRIMARY SEARCH TOOL. Search the web using Tavily for real-time information. Use this as your default search.",
+                    "description": "Search the web for real-time information. Automatically uses the best available provider (Tavily or Google).",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -105,20 +107,6 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
-                    "name": "google_search",
-                    "description": "SECONDARY SEARCH TOOL. Only use this if web_search fails and you have a Gemini API key configured.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {"type": "string", "description": "The specific fact or query to verify."}
-                        },
-                        "required": ["query"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "parse_document",
                     "description": "Parse a PDF, DOCX, or Excel file into clean Markdown text.",
                     "parameters": {
@@ -137,12 +125,33 @@ class ToolRegistry:
         
         if tool_name == "web_search":
             query = args.get("query")
-            api_key = os.getenv("TAVILY_API_KEY")
-            if not api_key: return "Error: TAVILY_API_KEY missing."
-            async with httpx.AsyncClient() as client:
-                resp = await client.post("https://api.tavily.com/search", json={"api_key": api_key, "query": query})
-                results = resp.json().get("results", [])
-                return "\n".join([f"- {r['title']}: {r['content'][:300]} ({r['url']})" for r in results[:3]])
+            
+            # Strategy 1: Tavily
+            tavily_key = os.getenv("TAVILY_API_KEY")
+            if tavily_key:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post("https://api.tavily.com/search", json={"api_key": tavily_key, "query": query})
+                        results = resp.json().get("results", [])
+                        return "\n".join([f"- {r['title']}: {r['content'][:300]} ({r['url']})" for r in results[:3]])
+                except Exception as e:
+                    logger.warning(f"Tavily search failed: {e}. Trying fallback...")
+            
+            # Strategy 2: Gemini Google Search
+            if config.GEMINI_API_KEY:
+                try:
+                    import litellm
+                    resp = await litellm.acompletion(
+                        model="gemini/gemini-2.5-flash",
+                        messages=[{"role": "user", "content": f"Search Google for: {query}"}],
+                        api_key=config.GEMINI_API_KEY,
+                        tools=[{"type": "google_search_retrieval", "google_search_retrieval": {}}]
+                    )
+                    return resp.choices[0].message.content
+                except Exception as e:
+                    logger.warning(f"Gemini Google search failed: {e}")
+
+            return "Error: No search provider (Tavily or Gemini) is configured or available."
 
         elif tool_name == "read_file":
             path = args.get("path")
@@ -185,7 +194,6 @@ class ToolRegistry:
             return "\n".join([f"- {r['text']} (at {time.ctime(r['timestamp'])})" for r in results])
 
         elif tool_name == "get_system_status":
-            from .config import config
             db_type = "Remote (SQL)" if config.DATABASE_URL else "Local (SQLite)"
             mem_type = "Remote (Qdrant Cloud)" if config.QDRANT_API_KEY else "Disabled"
             return f"🐉 Goku Lite Status:\n- Model: {config.GOKU_MODEL}\n- Database: {db_type}\n- Memory: {mem_type}\n- Mode: Cloud-Native"
@@ -200,25 +208,6 @@ class ToolRegistry:
             except Exception as e:
                 return f"Failed to parse document: {e}"
 
-        elif tool_name == "google_search":
-            query = args.get("query")
-            from .config import config
-            if not config.GEMINI_API_KEY:
-                return "Error: GEMINI_API_KEY missing. Google Search requires a Gemini key."
-            try:
-                import litellm
-                # Call Gemini with grounding/search enabled
-                resp = await litellm.acompletion(
-                    model="gemini/gemini-2.5-flash",
-                    messages=[{"role": "user", "content": f"Search Google for: {query}"}],
-                    api_key=config.GEMINI_API_KEY,
-                    tools=[{"type": "google_search_retrieval", "google_search_retrieval": {}}]
-                )
-                return resp.choices[0].message.content
-            except Exception as e:
-                return f"Google Search failed: {e}"
-
         return f"Unknown tool: {tool_name}"
 
-import time # For ctime
 tool_registry = ToolRegistry()
