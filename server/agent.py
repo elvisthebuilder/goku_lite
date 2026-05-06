@@ -46,8 +46,14 @@ class CloudAgent:
         messages = history.get_messages(session_id)
         
         # 2. Add System Prompt (Awareness)
-        if not messages:
-            messages.append({"role": "system", "content": self._get_system_prompt(source)})
+        # Ensure the latest system prompt is ALWAYS at the beginning of the context
+        system_prompt = self._get_system_prompt(source)
+        
+        # If there's already a system prompt, update it. If not, add it.
+        if messages and messages[0]["role"] == "system":
+            messages[0]["content"] = system_prompt
+        else:
+            messages.insert(0, {"role": "system", "content": system_prompt})
         
         # 3. Add current message
         messages.append({"role": "user", "content": user_input})
