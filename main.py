@@ -19,7 +19,10 @@ if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
     print("🐉 Goku Lite: Missing configuration. Launching Onboarding Wizard...")
     try:
         setup_script = os.path.join(base_dir, "setup.py")
-        subprocess.run([sys.executable, setup_script], check=True)
+        result = subprocess.run([sys.executable, setup_script])
+        if result.returncode != 0:
+            print("\n[red]🛑 Setup was cancelled or failed. Goku cannot start without configuration.[/]")
+            sys.exit(1)
         load_dotenv(env_path, override=True)
     except Exception as e:
         print(f"❌ Failed to launch onboarding: {e}")
