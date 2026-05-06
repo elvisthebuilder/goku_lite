@@ -15,7 +15,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "web_search",
-                    "description": "Search the web for real-time information. Automatically uses the best available provider (Tavily or Google).",
+                    "description": "Search the web for real-time information. Use the results to provide a natural, conversational answer. Do not just list the results.",
                     "parameters": {
                         "type": "object",
                         "properties": {
