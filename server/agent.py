@@ -40,6 +40,7 @@ class CloudAgent:
         base += self._get_skill("data_presentation")
         base += self._get_skill("no_hallucination")
         base += self._get_skill("skill_creator")
+        base += self._get_skill("skill_analyzer")
         
         if source == "cli":
             return base + "\n\n[CONTEXT] You are currently interacting via a Command Line Interface (CLI)."
