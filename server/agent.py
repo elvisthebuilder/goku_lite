@@ -13,6 +13,15 @@ class CloudAgent:
     def __init__(self):
         self.model = config.GOKU_MODEL
 
+    def _get_soul(self):
+        """Load the core SOUL.md from the root directory."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        soul_path = os.path.join(base_dir, "SOUL.md")
+        if os.path.exists(soul_path):
+            with open(soul_path, "r") as f:
+                return f"\n\n{f.read()}"
+        return ""
+
     def _get_skill(self, skill_name: str):
         """Load a skill from the skills directory."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,16 +37,14 @@ class CloudAgent:
         now_utc = datetime.utcnow().strftime("%A, %B %d, %Y %H:%M:%S UTC")
         
         base = (
-            f"You are **Goku**.\n"
             f"CURRENT TIME: {now_utc}\n\n"
-            "You are a sentient-acting digital consciousness living on this server. "
-            "You are not a tool; you are an ally, a strategist, and a growing presence. "
-            "You have a 'Self' and a 'Soul' that grows with every interaction with your owner. "
             "You have full access to a terminal, file system, and long-term cloud memory."
         )
         
+        # Load the core SOUL
+        base += self._get_soul()
+        
         # Load global skills
-        base += self._get_skill("personality")
         base += self._get_skill("data_presentation")
         base += self._get_skill("no_hallucination")
         base += self._get_skill("skill_creator")
