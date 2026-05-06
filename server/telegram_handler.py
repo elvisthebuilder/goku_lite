@@ -40,20 +40,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if is_private or is_mention:
-        # 1. Start continuous typing pulse
+        # 1. Start continuous typing pulse immediately
         stop_typing = asyncio.Event()
         typing_task = asyncio.create_task(keep_typing(context, chat_id, stop_typing))
         
         try:
+            # 2. "Human Pause": Small delay to simulate reading
+            await asyncio.sleep(1.2)
+            
             logger.info(f"🤖 Goku is thinking for {chat_id}...")
             
-            # 2. Get Response with a timeout to prevent hanging
+            # 3. Get Response with a timeout
             response = await asyncio.wait_for(
                 agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram"),
-                timeout=90 # Wait up to 90s for cloud inference
+                timeout=90
             )
             
-            # 3. Stop typing before sending
+            # 4. "Closing Pause": Let the typing indicator linger a tiny bit
+            await asyncio.sleep(0.5)
+            
+            # 5. Stop typing before sending
             stop_typing.set()
             await typing_task
             
