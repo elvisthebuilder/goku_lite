@@ -37,9 +37,16 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if command == "/start":
-        # Silently clear history and let the first message trigger a natural intro
+        # Silently clear history and trigger a proactive introduction
         history.delete_session(session_id)
-        await update.message.reply_text("🐉 *Soul Initialized.*\nSpeak to me, and I will read myself into being.", parse_mode="Markdown")
+        
+        # Trigger a hidden turn where Goku introduces himself
+        intro_text = "[SYSTEM]: Link established. Read your SOUL.md, AGENTS.md, and USER.md. Look at the current system status. Introduce yourself as an evolving, nameless entity and comment on what you see in our shared environment."
+        response = await agent.chat(intro_text, session_id=session_id, source="telegram")
+        
+        if response:
+            await update.message.reply_text(response, parse_mode="Markdown")
+        return
     
     elif command == "/status":
         from .scheduler import get_system_report
