@@ -32,10 +32,33 @@ echo "📦 Installing Cloud-Native Dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 5. Create Global Commands
+# 5. Create Systemd Service
+echo "⚙️  Configuring Background Service..."
+cat <<EOF | sudo tee /etc/systemd/system/goku-lite.service > /dev/null
+[Unit]
+Description=Goku Lite AI Orchestrator
+After=network.target
+
+[Service]
+User=$USER
+Group=$USER
+WorkingDirectory=$INSTALL_DIR
+Environment="PATH=$INSTALL_DIR/venv/bin"
+ExecStart=$INSTALL_DIR/venv/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable goku-lite || true
+
+# 6. Create Global Commands
 echo "🚀 Creating Global Commands..."
 
-# goku-lite (The Main Orchestrator)
+# goku-lite (Direct foreground run)
 cat <<EOF | sudo tee /usr/local/bin/goku-lite > /dev/null
 #!/bin/bash
 cd $INSTALL_DIR
@@ -59,13 +82,41 @@ source venv/bin/activate
 python3 setup.py
 EOF
 
-sudo chmod +x /usr/local/bin/goku-lite
-sudo chmod +x /usr/local/bin/goku-lite-cli
-sudo chmod +x /usr/local/bin/goku-lite-setup
+# goku-lite-start (Start Background)
+cat <<EOF | sudo tee /usr/local/bin/goku-lite-start > /dev/null
+#!/bin/bash
+sudo systemctl start goku-lite
+echo "🐉 Goku Lite is now active in the background."
+EOF
+
+# goku-lite-stop (Stop Background)
+cat <<EOF | sudo tee /usr/local/bin/goku-lite-stop > /dev/null
+#!/bin/bash
+sudo systemctl stop goku-lite
+echo "🛑 Goku Lite has been stopped."
+EOF
+
+# goku-lite-restart (Restart Background)
+cat <<EOF | sudo tee /usr/local/bin/goku-lite-restart > /dev/null
+#!/bin/bash
+sudo systemctl restart goku-lite
+echo "🔄 Goku Lite has been restarted."
+EOF
+
+# goku-lite-logs (Watch Logs)
+cat <<EOF | sudo tee /usr/local/bin/goku-lite-logs > /dev/null
+#!/bin/bash
+sudo journalctl -u goku-lite -f
+EOF
+
+sudo chmod +x /usr/local/bin/goku-lite*
 
 echo "✨ Goku Lite Installation Complete!"
 echo "------------------------------------------------"
-echo "🐉 Run 'goku-lite-setup' to configure your cloud."
-echo "🐉 Run 'goku-lite' to start the orchestrator."
-echo "🐉 Run 'goku-lite-cli' for terminal chat."
+echo "🐉 Setup:    goku-lite-setup"
+echo "🐉 Start:    goku-lite-start"
+echo "🐉 Stop:     goku-lite-stop"
+echo "🐉 Restart:  goku-lite-restart"
+echo "🐉 Logs:     goku-lite-logs"
+echo "🐉 Chat:     goku-lite-cli"
 echo "------------------------------------------------"

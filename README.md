@@ -45,25 +45,21 @@ graph TD
 
 ---
 
-## 🛠️ Setup & Configuration
+## 📱 Usage & Management
 
-After installation, simply run the global setup wizard:
+### Background Operation (Production)
+Goku Lite runs as a system service. Use these commands to manage the orchestrator:
 
-```bash
-goku-lite-setup
-```
+- **`goku-lite-start`**: Start the background orchestrator.
+- **`goku-lite-stop`**: Stop the background orchestrator.
+- **`goku-lite-restart`**: Restart the orchestrator (use after config changes).
+- **`goku-lite-logs`**: Watch real-time logs to see Goku's thoughts.
 
-This will guide you through connecting your Cloud AI, Database, Memory, and Messaging channels.
+### Interactive Terminal
+- **`goku-lite-cli`**: Enter the high-fidelity terminal chat.
 
----
-
-## 📱 Multi-Channel Usage
-
-### Global CLI
-Once installed, just type:
-```bash
-goku-lite
-```
+### Configuration
+- **`goku-lite-setup`**: Run the onboarding wizard to link cloud services.
 
 ### Messaging
 - **Telegram**: Interact with your bot 24/7. Use `[voice]` to get a voice response.
