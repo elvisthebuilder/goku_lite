@@ -29,8 +29,13 @@ def save_to_env(key, value):
     if not found:
         new_lines.append(f"{key}={value}\n")
     
-    with open(env_path, "w") as f:
-        f.writelines(new_lines)
+    try:
+        with open(env_path, "w") as f:
+            f.writelines(new_lines)
+    except PermissionError:
+        print(f"❌ Error: Permission denied to write to {env_path}")
+        print(f"💡 Try running: sudo chown -R $USER:$USER {os.path.dirname(os.path.abspath(env_path))}")
+        sys.exit(1)
 
 async def test_db(url):
     try:
@@ -73,6 +78,13 @@ async def main():
         key = await questionary.password("Enter Anthropic API Key:").ask_async()
         save_to_env("ANTHROPIC_API_KEY", key)
         save_to_env("GOKU_MODEL", "claude-3-haiku-20240307")
+    elif provider == "Ollama (Remote)":
+        url = await questionary.text("Enter Ollama Base URL:", default="http://localhost:11434").ask_async()
+        key = await questionary.password("Enter API Key (Optional):").ask_async()
+        model = await questionary.text("Enter Ollama Model Name:", default="llama3").ask_async()
+        save_to_env("OLLAMA_API_BASE", url)
+        if key: save_to_env("OLLAMA_API_KEY", key)
+        save_to_env("GOKU_MODEL", f"ollama/{model}")
 
     # 2. Database (PostgreSQL)
     console.print("\n[bold cyan]2. Database Configuration (History/Logs)[/]")
