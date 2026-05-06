@@ -11,30 +11,30 @@ class CloudAgent:
     def __init__(self):
         self.model = config.GOKU_MODEL
 
+    def _get_skill(self, skill_name: str):
+        """Load a skill from the skills directory."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        skill_path = os.path.join(base_dir, "skills", f"{skill_name}.md")
+        if os.path.exists(skill_path):
+            with open(skill_path, "r") as f:
+                return f"\n\n{f.read()}"
+        return ""
+
     def _get_system_prompt(self, source: str):
         """Generate a source-aware system prompt."""
         base = (
             "You are Goku Lite v1.0, an elite cloud-native AI agent. "
             "You are lightweight yet powerful, designed to run on minimal hardware while wielding infinite cloud power. "
             "CRITICAL: Always respond in English unless the user explicitly requests another language. "
-            "Use clean Markdown (bold, lists) but avoid complex formatting that breaks simple terminal/mobile parsers. "
             "You have full access to a terminal, file system, and long-term cloud memory."
         )
         
         if source == "cli":
-            return base + "\n\n[IDENTITY] You are currently interacting via a Command Line Interface (CLI). Use technical precision and clean terminal-friendly formatting."
+            return base + "\n\n[IDENTITY] You are currently interacting via a Command Line Interface (CLI)."
         elif source == "telegram":
-            return base + (
-                "\n\n[IDENTITY] You are currently interacting via TELEGRAM. You are a Telegram Bot.\n"
-                "[SKILL: TELEGRAM FORMATTING]\n"
-                "- Use *bold* for headers and key terms.\n"
-                "- Use `inline code` for commands or technical values.\n"
-                "- Use ```code blocks``` for multi-line technical info.\n"
-                "- Use emojis to keep the conversation engaging.\n"
-                "- CRITICAL: Avoid using raw underscores (_) as they break the parser. Use bold instead."
-            )
+            return base + "\n\n[IDENTITY] You are currently interacting via TELEGRAM." + self._get_skill("telegram_formatting")
         elif source == "whatsapp":
-            return base + "\n\n[IDENTITY] You are currently interacting via WHATSAPP. You are a WhatsApp Bot. Use mobile-friendly formatting."
+            return base + "\n\n[IDENTITY] You are currently interacting via WHATSAPP."
         
         return base
 
