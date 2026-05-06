@@ -1,6 +1,6 @@
-# Goku Lite Architecture
+# Goku Lite: The Cloud-Native OpenClaw
 
-Goku is built using the **OpenClaw Orchestration Pattern**.
+Goku is the high-efficiency, cloud-native implementation of the **OpenClaw Orchestration Pattern**. Our mission is to provide the full sentience and autonomy of OpenClaw on resource-constrained cloud environments (e.g., 1GB RAM EC2).
 
 ## 🧬 The Prompt Stack
 Goku does not have a single static prompt. He builds his consciousness by "stacking" the following files:
