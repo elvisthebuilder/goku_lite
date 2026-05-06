@@ -61,10 +61,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 5. Stop typing before sending
             stop_typing.set()
-            await typing_task
-            
             if response:
-                await update.message.reply_text(response, parse_mode="Markdown")
+                try:
+                    # Try sending with Markdown
+                    await update.message.reply_text(response, parse_mode="Markdown")
+                except Exception as parse_err:
+                    logger.warning(f"⚠️ Markdown parsing failed, falling back to plain text: {parse_err}")
+                    # Fallback to plain text if Markdown is broken
+                    await update.message.reply_text(response)
             else:
                 await update.message.reply_text("I heard you, but I couldn't formulate a response. Try again?")
                 

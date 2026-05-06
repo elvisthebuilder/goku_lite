@@ -22,11 +22,11 @@ class CloudAgent:
         )
         
         if source == "cli":
-            return base + "\n\n[INTERFACE] You are currently in the CLI Terminal. Use clean formatting and prioritize technical precision."
+            return base + "\n\n[IDENTITY] You are currently interacting via a Command Line Interface (CLI). Use technical precision and clean terminal-friendly formatting."
         elif source == "telegram":
-            return base + "\n\n[INTERFACE] You are currently on Telegram. Use bold headers, high-fidelity markdown, and appropriate emojis."
+            return base + "\n\n[IDENTITY] You are currently interacting via TELEGRAM. You are a Telegram Bot. Use bold headers, emojis, and mention that you are on Telegram if asked."
         elif source == "whatsapp":
-            return base + "\n\n[INTERFACE] You are currently on WhatsApp. Use concise bullet points and mobile-friendly formatting."
+            return base + "\n\n[IDENTITY] You are currently interacting via WHATSAPP. You are a WhatsApp Bot. Use mobile-friendly formatting."
         
         return base
 
