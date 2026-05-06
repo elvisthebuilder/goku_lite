@@ -107,7 +107,7 @@ class CloudAgent:
                     function_name = tool_call.function.name
                     function_args = json.loads(tool_call.function.arguments)
                     
-                    tool_output = await tool_registry.execute(function_name, function_args)
+                    tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
                     
                     messages.append({
                         "tool_call_id": tool_call.id,

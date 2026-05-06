@@ -113,4 +113,16 @@ class CloudMemory:
             logger.error(f"Memory search failed: {e}")
             return []
 
+    async def clear_all_memory(self):
+        """Wipes the entire vector collection."""
+        if not self.client: return False
+        try:
+            self.client.delete_collection(collection_name=self.collection_name)
+            self._ensure_collection()
+            logger.info("Memory collection wiped and recreated.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear memory: {e}")
+            return False
+
 memory = CloudMemory()

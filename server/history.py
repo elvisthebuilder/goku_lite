@@ -55,4 +55,18 @@ class CloudHistory:
             messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
             return [{"role": m.role, "content": m.content} for m in messages]
 
+    def clear_history(self, session_id: str):
+        """Wipes all messages for a specific session."""
+        with self.Session() as db:
+            db.query(MessageModel).filter_by(session_id=session_id).delete()
+            db.commit()
+
+    def delete_session(self, session_id: str):
+        """Deletes the entire session and its messages."""
+        with self.Session() as db:
+            session = db.query(SessionModel).filter_by(id=session_id).first()
+            if session:
+                db.delete(session)
+                db.commit()
+
 history = CloudHistory()

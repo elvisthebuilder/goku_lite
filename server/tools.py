@@ -117,10 +117,26 @@ class ToolRegistry:
                         "required": ["path"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "clear_history",
+                    "description": "Wipe the current conversation history. Use this if the user wants to start a fresh chat or forget the current context.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "clear_memory",
+                    "description": "NUCLEAR OPTION. Wipe all long-term vector memory. This cannot be undone.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
             }
         ]
 
-    async def execute(self, tool_name, args):
+    async def execute(self, tool_name, args, session_id=None):
         logger.info(f"Executing tool: {tool_name} with args: {args}")
         
         if tool_name == "web_search":
@@ -206,7 +222,20 @@ class ToolRegistry:
                 result = md.convert(path)
                 return result.text_content
             except Exception as e:
-                return f"Failed to parse document: {e}"
+                return f"Google Search failed: {e}"
+
+        elif tool_name == "clear_history":
+            if not session_id: return "Error: No session ID provided."
+            from .history import history
+            history.clear_history(session_id)
+            return "Successfully wiped current chat history. I have forgotten our current conversation."
+
+        elif tool_name == "clear_memory":
+            success = await memory.clear_all_memory()
+            if success:
+                return "Successfully wiped all long-term vector memory. I have forgotten everything I learned in the past."
+            else:
+                return "Failed to clear long-term memory. Is Qdrant configured?"
 
         return f"Unknown tool: {tool_name}"
 
