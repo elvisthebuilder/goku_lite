@@ -90,6 +90,7 @@ create_global_cmd "goku-lite-cli" "cli.py"
 create_global_cmd "goku" "cli.py"
 create_global_cmd "goku-lite-setup" "setup.py"
 create_global_cmd "goku-lite-wizard" "setup.py"
+create_global_cmd "goku-lite-model" "set_model.py"
 
 # Management Helpers
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-start > /dev/null

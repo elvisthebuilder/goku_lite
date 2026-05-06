@@ -8,6 +8,15 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
+async def keep_typing(context, chat_id, stop_event):
+    """Pulsing typing indicator to keep it alive during long AI thinking."""
+    while not stop_event.is_set():
+        try:
+            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+            await asyncio.sleep(4) # Telegram typing lasts ~5 seconds
+        except:
+            break
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -31,28 +40,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if is_private or is_mention:
+        # 1. Start continuous typing pulse
+        stop_typing = asyncio.Event()
+        typing_task = asyncio.create_task(keep_typing(context, chat_id, stop_typing))
+        
         try:
-            # 1. Immediate Acknowledgement: Set typing status
-            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-            
             logger.info(f"🤖 Goku is thinking for {chat_id}...")
             
-            # 2. Get Response
-            response = await agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram")
+            # 2. Get Response with a timeout to prevent hanging
+            response = await asyncio.wait_for(
+                agent.chat(user_text, session_id=f"tg_{chat_id}", source="telegram"),
+                timeout=90 # Wait up to 90s for cloud inference
+            )
             
-            # 3. Send Response with Markdown rendering
+            # 3. Stop typing before sending
+            stop_typing.set()
+            await typing_task
+            
             if response:
-                # Use Markdown (V1) for safe but effective bold/italic rendering
                 await update.message.reply_text(response, parse_mode="Markdown")
             else:
                 await update.message.reply_text("I heard you, but I couldn't formulate a response. Try again?")
                 
+        except asyncio.TimeoutError:
+            stop_typing.set()
+            logger.error(f"⏱️ Cloud timeout for {chat_id}")
+            await update.message.reply_text("⏳ The cloud brain is taking too long to respond. Please try again in a moment.")
         except Exception as e:
+            stop_typing.set()
             logger.error(f"❌ Telegram Error: {e}")
-            # Fallback without markdown if rendering fails
             try:
-                await update.message.reply_text("📦 Sorry, I hit a snag while thinking. Please try again.")
+                await update.message.reply_text(f"📦 Error: {str(e)[:100]}")
             except: pass
+        finally:
+            if not stop_typing.is_set():
+                stop_typing.set()
 
 async def start_telegram_bot():
     token = config.TELEGRAM_BOT_TOKEN
@@ -72,7 +94,6 @@ async def start_telegram_bot():
         await application.start()
         await application.updater.start_polling()
         
-        # Keep the task alive
         while True:
             await asyncio.sleep(3600)
     except Exception as e:
