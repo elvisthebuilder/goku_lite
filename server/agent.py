@@ -31,8 +31,9 @@ class CloudAgent:
             "You have full access to a terminal, file system, and long-term cloud memory."
         )
         
-        # Load global personality
+        # Load global skills
         base += self._get_skill("personality")
+        base += self._get_skill("data_presentation")
         
         if source == "cli":
             return base + "\n\n[CONTEXT] You are currently interacting via a Command Line Interface (CLI)."
