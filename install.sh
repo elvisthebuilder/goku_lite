@@ -41,6 +41,7 @@ PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_i
 sudo apt-get install -y "python3.$PY_VER-venv" || true
 
 python3 -m venv venv
+sudo chown -R $USER:$USER venv
 source venv/bin/activate
 
 # 5. Dependencies
