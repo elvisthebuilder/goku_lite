@@ -277,36 +277,25 @@ class ToolRegistry:
             from .scheduler import set_briefing_time
             set_briefing_time(hour, minute)
             
-            # 2. Persist to .env
+            # 2. Persist to goku_settings.json (Safe Storage)
             try:
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                env_path = os.path.join(base_dir, ".env")
+                settings_path = os.path.join(base_dir, "goku_settings.json")
                 
-                with open(env_path, "r") as f:
-                    lines = f.readlines()
+                settings = {}
+                if os.path.exists(settings_path):
+                    with open(settings_path, "r") as f:
+                        settings = json.load(f)
                 
-                new_lines = []
-                found_h = False
-                found_m = False
-                for line in lines:
-                    if line.startswith("BRIEFING_HOUR="):
-                        new_lines.append(f"BRIEFING_HOUR={hour}\n")
-                        found_h = True
-                    elif line.startswith("BRIEFING_MINUTE="):
-                        new_lines.append(f"BRIEFING_MINUTE={minute}\n")
-                        found_m = True
-                    else:
-                        new_lines.append(line)
+                settings["briefing_hour"] = hour
+                settings["briefing_minute"] = minute
                 
-                if not found_h: new_lines.append(f"BRIEFING_HOUR={hour}\n")
-                if not found_m: new_lines.append(f"BRIEFING_MINUTE={minute}\n")
-                
-                with open(env_path, "w") as f:
-                    f.writelines(new_lines)
+                with open(settings_path, "w") as f:
+                    json.dump(settings, f, indent=4)
                     
-                return f"I've updated my morning briefing to {hour:02d}:{minute:02d} UTC. I've also saved this to my configuration so I'll remember it after a restart!"
+                return f"I've updated my morning briefing to {hour:02d}:{minute:02d} UTC. I've saved this to my private settings file (goku_settings.json) to keep your .env file safe!"
             except Exception as e:
-                return f"I've updated the timer for now, but I couldn't save it to my config file: {e}"
+                return f"I've updated the timer for now, but I couldn't save it to my settings file: {e}"
 
         elif tool_name == "clear_history":
             if not session_id: return "Error: No session ID provided."
