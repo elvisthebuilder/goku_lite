@@ -22,6 +22,23 @@ class CloudAgent:
                 return f"\n\n## {filename}\n{f.read()}"
         return ""
 
+    def _get_skills_registry(self) -> str:
+        """Scan the skills/ directory and return a list of available skills."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        skills_dir = os.path.join(base_dir, "skills")
+        if not os.path.exists(skills_dir):
+            return ""
+        
+        skills = [f for f in os.listdir(skills_dir) if f.endswith(".md")]
+        if not skills:
+            return ""
+        
+        registry = "\n\n## Available Skills\n"
+        registry += "You have these skill extensions available. You can read them using `read_file('skills/filename.md')` to activate their logic:\n"
+        for skill in skills:
+            registry += f"- {skill}\n"
+        return registry
+
     def _get_runtime_info(self) -> str:
         """Get real-time system metrics for the prompt."""
         try:
@@ -65,8 +82,9 @@ class CloudAgent:
             "For behavior, commands, or architecture: consult local docs in the `docs/` directory first using the `read` tool."
         )
         
-        # 4. Inject Runtime Info
+        # 4. Inject Runtime Info & Skills
         prompt += self._get_runtime_info()
+        prompt += self._get_skills_registry()
         
         # 5. Interface Context (Platform Agnostic)
         prompt += f"\n\n## Interface Context\n- Currently communicating via: {source.upper()}\n- Formatting: Use Clean Markdown optimized for {source.upper()}."
