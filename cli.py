@@ -39,6 +39,8 @@ def show_help():
     table.add_row("/help", "Show this help menu")
     table.add_row("/status", "Check Cloud Connectivity (Memory/DB/LLM)")
     table.add_row("/setup", "Run the Configuration Wizard")
+    table.add_row("/reset", "Wipe all memories and history (Tabula Rasa)")
+    table.add_row("/update", "Pull the latest updates from GitHub")
     table.add_row("/exit", "Close the CLI")
     console.print(table)
 
@@ -84,6 +86,12 @@ async def main():
                 elif cmd == "/setup":
                     import subprocess
                     subprocess.run(["python3", "setup.py"])
+                elif cmd == "/reset":
+                    console.print("[bold red]⚠️  WARNING:[/] To perform a total reset (wiping all memory and history), exit this CLI and run:")
+                    console.print("[bold cyan]python3 scripts/total_reset.py[/]")
+                elif cmd == "/update":
+                    console.print("[bold cyan]🔄 To update Goku Lite to the latest version, exit this CLI and run:[/]")
+                    console.print("[bold cyan]goku-lite-update[/]")
                 elif cmd in ["/exit", "/quit"]:
                     break
                 else:

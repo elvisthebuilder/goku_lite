@@ -100,4 +100,12 @@ class CloudHistory:
                 db.delete(session)
                 db.commit()
 
+    def wipe_all_data(self):
+        """DANGER: Wipes every single session and message in the entire database."""
+        with self.Session() as db:
+            # Drop all tables and recreate them to ensure a clean slate
+            Base.metadata.drop_all(self.engine)
+            Base.metadata.create_all(self.engine)
+            logger.info("SQL Database wiped clean (all sessions deleted).")
+
 history = CloudHistory()

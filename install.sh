@@ -93,6 +93,8 @@ create_global_cmd "goku" "cli.py"
 create_global_cmd "goku-lite-setup" "setup.py"
 create_global_cmd "goku-lite-wizard" "setup.py"
 create_global_cmd "goku-lite-model" "set_model.py"
+create_global_cmd "goku-lite-total-reset" "scripts/total_reset.py"
+create_global_cmd "goku-lite-update" "scripts/self_update.py"
 
 # Management Helpers
 cat <<EOF | sudo tee /usr/local/bin/goku-lite-start > /dev/null
@@ -128,4 +130,6 @@ echo "🐉 Stop:     goku-lite-stop"
 echo "🐉 Restart:  goku-lite-restart"
 echo "🐉 Logs:     goku-lite-logs"
 echo "🐉 Chat:     goku-lite-cli"
+echo "🐉 Reset:    goku-lite-total-reset"
+echo "🐉 Update:   goku-lite-update"
 echo "------------------------------------------------"
