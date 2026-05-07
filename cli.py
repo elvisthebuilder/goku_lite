@@ -111,7 +111,29 @@ async def main():
                 response = await agent.chat(user_input, session_id=session_id, source="cli")
                 
                 if response:
-                    console.print(Panel(response, title="[bold dragon]Goku[/]", border_style="cyan"))
+                    import re
+                    # Extract thinking blocks
+                    thinking_match = re.search(r'<think>(.*?)</think>', response, re.DOTALL)
+                    clean_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+                    
+                    # 1. Render the Thought Box (Cognitive Stream)
+                    if thinking_match:
+                        thought_content = thinking_match.group(1).strip()
+                        if thought_content:
+                            console.print(Panel(
+                                thought_content, 
+                                title="[dim]Cognitive Stream[/]", 
+                                border_style="dim", 
+                                subtitle="[dim]Internal reasoning[/]",
+                                style="italic dim"
+                            ))
+                    
+                    # 2. Render the Final Response
+                    if clean_response and clean_response != "∅":
+                        console.print(Panel(clean_response, title="[bold dragon]Goku[/]", border_style="cyan"))
+                    elif not thinking_match:
+                        # Fallback for empty responses
+                        pass
                 else:
                     # In CLI, we might want to show a subtle indicator if the agent is silent
                     pass

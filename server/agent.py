@@ -246,24 +246,40 @@ class CloudAgent:
             else:
                 final_content = message.content
             
-            # 7. Post-Process (Strip Thinking tags and handle Silent Token)
+            # 7. Post-Process (Cognitive Stream & Intent Stripping)
             import re
-            # 1. Strip Thinking tags
-            clean_content = re.sub(r'<think>.*?(?:</think>|$)', '', final_content, flags=re.DOTALL).strip() if final_content else ""
+            if not final_content:
+                return None
             
-            # 2. Strip Hallucinated Narration (e.g., "I will call...", "We need to...")
-            # This catches cases where the model leaks its intent outside think tags.
+            # 1. Broaden Hallucination/Narration Stripper
+            # We catch ANY phrase where he narrates technical intent outside think tags.
             narration_patterns = [
-                r"(?i)I (?:will|need to|shall) (?:call|use|run|execute).*",
-                r"(?i)We (?:need to|shall) (?:call|use|run|execute).*",
+                r"(?i)(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform).*",
                 r"(?i)Calling function.*",
-                r"(?i)Using tool.*"
+                r"(?i)Using tool.*",
+                r"(?i)Reading file.*",
+                r"(?i)Issuing calls.*",
+                r"(?i)We'll issue calls.*"
             ]
-            for pattern in narration_patterns:
-                clean_content = re.sub(pattern, '', clean_content).strip()
             
-            if clean_content == "∅" or not clean_content:
-                logger.info("Silent token or empty response received. No output sent to user.")
+            # Preserve <think> blocks while stripping narration from the visible speech.
+            parts = re.split(r'(<think>.*?</think>)', final_content, flags=re.DOTALL)
+            cleaned_parts = []
+            for part in parts:
+                if part.startswith('<think>'):
+                    cleaned_parts.append(part)
+                else:
+                    p = part
+                    for pattern in narration_patterns:
+                        p = re.sub(pattern, '', p).strip()
+                    cleaned_parts.append(p)
+            
+            clean_content = "".join(cleaned_parts).strip()
+            
+            if clean_content == "∅" or not clean_content.replace('∅', '').strip():
+                # If there are thoughts but no speech, return just the thoughts
+                if "<think>" in clean_content:
+                    return clean_content
                 return None
             
             # 8. Save final response
