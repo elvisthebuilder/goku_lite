@@ -230,7 +230,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-        doc_context = f"--- ATTACHED DOCUMENT: {file_name} ---\n{content}\n--- END DOCUMENT ---"
+        doc_context = f"[File Received: {file_name}]\n{content}"
         history.add_message(session_id=f"tg_{chat_id}", role="system", content=doc_context, msg_type="document")
 
         await update.message.reply_text("✅ Done reading! What would you like to know about this document?")

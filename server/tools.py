@@ -14,8 +14,8 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
-                    "name": "web_search",
-                    "description": "Search the web for real-time information. Use the results to provide a natural, conversational answer. Do not just list the results.",
+                    "name": "google_search",
+                    "description": "Search the web for real-time information. Use the results to provide a natural, conversational answer.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -108,7 +108,7 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
-                    "name": "parse_document",
+                    "name": "analyze_document",
                     "description": "Parse a PDF, DOCX, or Excel file into clean Markdown text.",
                     "parameters": {
                         "type": "object",
@@ -116,6 +116,22 @@ class ToolRegistry:
                             "path": {"type": "string", "description": "Relative path to the document file."}
                         },
                         "required": ["path"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "manage_tasks",
+                    "description": "Create, update, or list tasks for a multi-step objective. Mandatory for complex plans.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {"type": "string", "enum": ["add", "update", "list", "clear"]},
+                            "tasks": {"type": "array", "items": {"type": "string"}},
+                            "index": {"type": "integer"}
+                        },
+                        "required": ["action"]
                     }
                 }
             },
@@ -191,7 +207,7 @@ class ToolRegistry:
     async def execute(self, tool_name, args, session_id=None):
         logger.info(f"Executing tool: {tool_name} with args: {args}")
         
-        if tool_name == "web_search":
+        if tool_name == "google_search":
             query = args.get("query")
             
             # Strategy 1: Tavily
@@ -267,7 +283,7 @@ class ToolRegistry:
             mem_type = "Remote (Qdrant Cloud)" if config.QDRANT_API_KEY else "Disabled"
             return f"🐉 Goku Lite Status:\n- Model: {config.GOKU_MODEL}\n- Database: {db_type}\n- Memory: {mem_type}\n- Mode: Cloud-Native"
 
-        elif tool_name == "parse_document":
+        elif tool_name == "analyze_document":
             path = args.get("path")
             try:
                 from markitdown import MarkItDown
@@ -345,6 +361,28 @@ class ToolRegistry:
                 return msg
             else:
                 return "Failed to clear long-term memory."
+
+        elif tool_name == "manage_tasks":
+            action = args.get("action")
+            tasks_file = "goku_tasks.json"
+            import json
+            current_tasks = []
+            if os.path.exists(tasks_file):
+                try:
+                    with open(tasks_file, "r") as f: current_tasks = json.load(f)
+                except: current_tasks = []
+            
+            if action == "add": current_tasks.extend(args.get("tasks", []))
+            elif action == "clear": current_tasks = []
+            elif action == "list": pass
+            elif action == "update":
+                idx = args.get("index")
+                new_tasks = args.get("tasks", [])
+                if idx is not None and 0 <= idx < len(current_tasks) and new_tasks:
+                    current_tasks[idx] = new_tasks[0]
+            
+            with open(tasks_file, "w") as f: json.dump(current_tasks, f)
+            return f"Current Task List:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(current_tasks)]) if current_tasks else "Task list is empty."
 
         return f"Unknown tool: {tool_name}"
 
