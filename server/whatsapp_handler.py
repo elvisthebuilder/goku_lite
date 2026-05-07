@@ -8,24 +8,36 @@ from .config import config
 logger = logging.getLogger(__name__)
 
 async def start_whatsapp_bot():
-    # In a real Lite setup, we might skip the local DB for Neonize if possible, 
-    # but for now we'll use a small sqlite file for the session only.
+    """Goku Lite WhatsApp Interface (powered by Neonize)."""
+    # Use a small sqlite file for the session only.
     client = NewClient("goku_lite_wa.db")
 
     @client.event(MessageEv)
     async def on_message(client, message: MessageEv):
+        # We only handle text conversations for now
         if message.Message.conversation:
             user_text = message.Message.conversation
             chat_id = message.Info.MessageSource.Chat.String()
             
             logger.info(f"WhatsApp message from {chat_id}: {user_text}")
             
-            # Respond to all DMs in Lite mode
-            response = await agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp")
-            client.send_message(message.Info.MessageSource.Chat, response)
+            try:
+                # 1. Chat with Agent (using WhatsApp session)
+                response = await agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp")
+                
+                # 2. Silent Turn Handling (OpenClaw standard)
+                if response:
+                    # WhatsApp doesn't support full Markdown, so we ensure it's clean
+                    client.send_message(message.Info.MessageSource.Chat, response)
+                else:
+                    logger.info(f"Agent is silent for WhatsApp user {chat_id}.")
+            except Exception as e:
+                logger.error(f"WhatsApp Handler Error: {e}")
 
     logger.info("🐉 Goku Lite: WhatsApp bot initializing...")
-    # Neonize is synchronous in its connect call usually, or requires a loop.
-    # For Lite, we'll assume the user runs this as a background task.
-    # Note: WhatsApp requires scanning a QR code on first run.
+    # Note: On first run, check the console for the QR code to link your account.
+    # client.connect() is usually blocking or starts its own loop.
     client.connect()
+
+if __name__ == "__main__":
+    asyncio.run(start_whatsapp_bot())

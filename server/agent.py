@@ -88,6 +88,9 @@ class CloudAgent:
         
         # 5. Interface Context (Platform Agnostic)
         prompt += f"\n\n## Interface Context\n- Currently communicating via: {source.upper()}\n- Formatting: Use Clean Markdown optimized for {source.upper()}."
+        
+        if source == "whatsapp":
+            prompt += "\n- WhatsApp Note: Use *bold*, _italic_, and ~strikethrough~ only. No headings or complex tables."
             
         # 6. CRITICAL IDENTITY (Most recent = highest weight)
         prompt += self._load_file("IDENTITY.md")
