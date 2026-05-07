@@ -144,7 +144,7 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
                     if len(chunks) > 1:
                         await asyncio.sleep(0.3)
             else:
-                await reply_to_message.reply_text("I'm not sure how to respond to that.")
+                logger.info("Agent is silent. No response sent to Telegram.")
 
         except asyncio.TimeoutError:
             stop_typing.set()

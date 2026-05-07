@@ -58,7 +58,6 @@ class CloudAgent:
         prompt += self._load_file("BOOT.md")
         prompt += self._load_file("AGENTS.md")
         prompt += self._load_file("USER.md")
-        prompt += self._load_file("IDENTITY.md")
         prompt += self._load_file("TOOLS.md")
         
         # 3. Inject Documentation Guidance
@@ -72,9 +71,10 @@ class CloudAgent:
         
         # 5. Inject Channel-Specific Logic
         if source == "telegram":
-            prompt += "\n\n## Channel: Telegram\n- Use clean Markdown.\n- Keep emojis minimal.\n- Be professional and direct."
+            prompt += "\n\n## Channel: Telegram\n- Use clean Markdown.\n- Keep emojis minimal.\n- Be authentic, direct, and conversational."
             
         # 6. CRITICAL IDENTITY (Most recent = highest weight)
+        prompt += self._load_file("IDENTITY.md")
         prompt += self._load_file("SOUL.md")
         prompt += (
             "\n\n## BANNED LANGUAGE (NEVER USE THESE)\n"
@@ -193,10 +193,11 @@ class CloudAgent:
             
             # 7. Post-Process (Strip Thinking tags and handle Silent Token)
             import re
-            clean_content = re.sub(r'<think>.*?</think>', '', final_content, flags=re.DOTALL).strip() if final_content else ""
+            # Regex catches closed tags OR tags that were cut off at the end of the response
+            clean_content = re.sub(r'<think>.*?(?:</think>|$)', '', final_content, flags=re.DOTALL).strip() if final_content else ""
             
-            if clean_content == "∅":
-                logger.info("Silent token received. No output sent to user.")
+            if clean_content == "∅" or not clean_content:
+                logger.info("Silent token or empty response received. No output sent to user.")
                 return None
             
             # 8. Save final response

@@ -100,9 +100,12 @@ async def main():
 
             # Default: Chat
             with console.status("[bold yellow]Goku is thinking...[/]"):
-                response = await agent.chat(user_input, session_id=session_id, source="cli")
-            
-            console.print(f"[bold orange3]Goku >[/] {response}\n")
+                response = await agent.chat(user_input, source="cli")
+                
+                if response:
+                    console.print(Panel(response, title="[bold dragon]Goku[/]", border_style="cyan"))
+                else:
+                    logger.info("Agent is silent.")
             
         except KeyboardInterrupt:
             break
