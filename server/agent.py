@@ -188,18 +188,47 @@ class CloudAgent:
             
             message = response.choices[0].message
             
-            # 6. Handle Tool Calls
-            if hasattr(message, 'tool_calls') and message.tool_calls:
+            # 6. Handle Tool Calls (Native Schema)
+            tool_calls = getattr(message, 'tool_calls', None)
+            manual_tool_call = None
+            
+            # Fallback: Catch models that output JSON as text (common in Qwen/Ollama)
+            if not tool_calls and message.content:
+                import re
+                json_match = re.search(r'\{.*"name".*".*".*"arguments".*\{.*\}.*\}', message.content, re.DOTALL)
+                if json_match:
+                    try:
+                        manual_tool_call = json.loads(json_match.group())
+                        logger.info(f"Intercepted manual JSON tool call: {manual_tool_call['name']}")
+                    except:
+                        pass
+
+            if tool_calls or manual_tool_call:
                 messages.append(message)
-                for tool_call in message.tool_calls:
-                    function_name = tool_call.function.name
-                    function_args = json.loads(tool_call.function.arguments)
+                
+                # Execute Native Tool Calls
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        function_name = tool_call.function.name
+                        function_args = json.loads(tool_call.function.arguments)
+                        tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                        messages.append({
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": function_name,
+                            "content": tool_output,
+                        })
+                
+                # Execute Manual (Hallucinated) Tool Call
+                if manual_tool_call:
+                    function_name = manual_tool_call['name']
+                    function_args = manual_tool_call['arguments']
                     tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
                     messages.append({
-                        "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": function_name,
                         "content": tool_output,
+                        "tool_call_id": "manual_call" # Fallback ID
                     })
                 
                 second_response = await litellm.acompletion(
