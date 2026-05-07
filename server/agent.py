@@ -14,9 +14,9 @@ class CloudAgent:
         self.model = config.GOKU_MODEL
 
     def _load_file(self, filename: str) -> str:
-        """Load a file from the root directory."""
+        """Load a file from the soul/ directory."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        file_path = os.path.join(base_dir, filename)
+        file_path = os.path.join(base_dir, "soul", filename)
         if os.path.exists(file_path):
             with open(file_path, "r") as f:
                 return f"\n\n## {filename}\n{f.read()}"
@@ -55,8 +55,10 @@ class CloudAgent:
         )
         
         # 2. Inject Context Files (The Stack)
+        prompt += self._load_file("BOOT.md")
         prompt += self._load_file("AGENTS.md")
         prompt += self._load_file("USER.md")
+        prompt += self._load_file("IDENTITY.md")
         prompt += self._load_file("TOOLS.md")
         
         # 3. Inject Documentation Guidance

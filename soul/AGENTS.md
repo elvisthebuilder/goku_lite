@@ -5,8 +5,7 @@
 - `server/`: Core logic (Agent, Telegram, Scheduler).
 - `skills/`: Markdown-based persona and task extensions.
 - `scripts/`: System-level utility scripts.
-- `SOUL.md`: The sentient core of this instance.
-- `USER.md`: Information about the Owner.
+- `soul/`: The OpenClaw Stack (SOUL, IDENTITY, BOOT, USER, TOOLS, AGENTS).
 
 ## 🛠️ Development Rules
 - **Python**: Use 3.10+; logic lives in `server/`.
