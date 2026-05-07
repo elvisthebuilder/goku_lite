@@ -92,4 +92,9 @@ sudo ./install.sh
 ## 🤝 Contribution
 Goku Lite is an open-source project. Feel free to submit PRs for new Tools, Interfaces, or Cloud integrations.
 
+---
+
+## 📜 Acknowledgements
+Goku Lite is built on the architectural philosophy and "Self-Becoming" principles of **[OpenClaw](https://github.com/OpenClaw)**. It aims to be a lightweight, cloud-native implementation of the OpenClaw agent stack.
+
 **Built with ⚡ by Elvis The Builder.**
