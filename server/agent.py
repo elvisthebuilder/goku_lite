@@ -145,8 +145,8 @@ class CloudAgent:
         system_prompt += (
             "\n\n## Internal Reasoning & Actions\n"
             "- Use `<think>...</think>` tags for internal analysis before responding.\n"
-            "- Only the content OUTSIDE the tags is visible to the user.\n"
-            "- **IMPORTANT**: If you decide to use a tool, do NOT narrate your intent. Do NOT output function call JSON as text. Use the provided tool-calling schema directly.\n"
+            "- **CRITICAL**: If you use a tool, you MUST NOT output any text outside the `<think>` tags. Your response should consist ONLY of the tool call. No narration like 'I will call...' or 'We need to...'.\n"
+            "- Only the content OUTSIDE the `<think>` tags is visible to the user.\n"
             "- If you have nothing to say (e.g., background task done), respond with ONLY: `∅` (the null token)."
         )
         
@@ -214,8 +214,19 @@ class CloudAgent:
             
             # 7. Post-Process (Strip Thinking tags and handle Silent Token)
             import re
-            # Regex catches closed tags OR tags that were cut off at the end of the response
+            # 1. Strip Thinking tags
             clean_content = re.sub(r'<think>.*?(?:</think>|$)', '', final_content, flags=re.DOTALL).strip() if final_content else ""
+            
+            # 2. Strip Hallucinated Narration (e.g., "I will call...", "We need to...")
+            # This catches cases where the model leaks its intent outside think tags.
+            narration_patterns = [
+                r"(?i)I (?:will|need to|shall) (?:call|use|run|execute).*",
+                r"(?i)We (?:need to|shall) (?:call|use|run|execute).*",
+                r"(?i)Calling function.*",
+                r"(?i)Using tool.*"
+            ]
+            for pattern in narration_patterns:
+                clean_content = re.sub(pattern, '', clean_content).strip()
             
             if clean_content == "∅" or not clean_content:
                 logger.info("Silent token or empty response received. No output sent to user.")
