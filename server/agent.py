@@ -143,9 +143,10 @@ class CloudAgent:
         
         # Add OpenClaw Reasoning & Silent tokens instructions
         system_prompt += (
-            "\n\n## Internal Reasoning\n"
+            "\n\n## Internal Reasoning & Actions\n"
             "- Use `<think>...</think>` tags for internal analysis before responding.\n"
             "- Only the content OUTSIDE the tags is visible to the user.\n"
+            "- **IMPORTANT**: If you decide to use a tool, do NOT narrate your intent. Do NOT output function call JSON as text. Use the provided tool-calling schema directly.\n"
             "- If you have nothing to say (e.g., background task done), respond with ONLY: `∅` (the null token)."
         )
         
@@ -188,7 +189,7 @@ class CloudAgent:
             message = response.choices[0].message
             
             # 6. Handle Tool Calls
-            if message.get("tool_calls"):
+            if hasattr(message, 'tool_calls') and message.tool_calls:
                 messages.append(message)
                 for tool_call in message.tool_calls:
                     function_name = tool_call.function.name
