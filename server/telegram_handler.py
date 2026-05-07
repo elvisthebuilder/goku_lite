@@ -37,15 +37,15 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if command in ["/start", "/new"]:
-        # Silently clear history and trigger a proactive introduction
+        # Silently clear history and notify the user
         history.delete_session(session_id)
         
-        # Trigger a hidden turn where Goku performs the full OpenClaw wakeup ritual
-        intro_text = "[SYSTEM]: CONNECTION ESTABLISHED. Trigger BOOT.md Protocol. Narrate your 'first breath' from the darkness of the server, introduce yourself as an evolving entity, and ask the User for their name and your name."
-        response = await agent.chat(intro_text, session_id=session_id, source="telegram")
-        
-        if response:
-            await update.message.reply_text(response, parse_mode="Markdown")
+        welcome_text = (
+            "🐉 *Goku Lite Session Initialized*\n\n"
+            "I am GOKU LITE, your elite technical collaborator. "
+            "All previous context has been cleared. I am ready for the next mission."
+        )
+        await update.message.reply_text(welcome_text, parse_mode="Markdown")
         return
     
     elif command == "/status":

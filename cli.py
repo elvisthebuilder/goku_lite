@@ -69,12 +69,8 @@ async def main():
     config.validate()
     session_id = "cli_session"
     
-    # 1. OpenClaw Wakeup: Trigger the BOOT.md protocol immediately
-    with console.status("[bold yellow]Goku is waking up...[/]"):
-        # This triggers the agent to follow BOOT.md: audit system, read soul, introduce itself.
-        response = await agent.chat("SYSTEM_WAKEUP_SIGNAL", session_id=session_id, source="cli")
-        if response:
-            console.print(Panel(response, title="[bold dragon]Goku[/]", border_style="cyan"))
+    # 1. Start Session
+    # Goku starts ready, no ritual required.
 
     # 2. Interactive Loop
     while True:

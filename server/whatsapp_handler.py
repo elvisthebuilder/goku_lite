@@ -25,7 +25,7 @@ async def start_whatsapp_bot():
                 # 1. Chat with Agent (using WhatsApp session)
                 response = await agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp")
                 
-                # 2. Silent Turn Handling (OpenClaw standard)
+                # 2. Silent Turn Handling
                 if response:
                     # WhatsApp doesn't support full Markdown, so we ensure it's clean
                     client.send_message(message.Info.MessageSource.Chat, response)

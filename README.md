@@ -43,6 +43,19 @@ graph TD
 - **🎙️ ElevenLabs Voice**: High-fidelity voice notes on Telegram and WhatsApp.
 - **📄 Multimodal**: Ingest PDFs, DOCX, Images, and Voice Notes instantly.
 
+## 🧠 The Native Brain (v3.0)
+Goku Lite uses a **Consolidated System Prompt** based on the Goku v3.0 Core. It does not rely on external markdown stacks.
+- **Identity Pinning**: Strictly identified as GOKU LITE.
+- **Core Principles**: Persistence, Planning, Execution Discipline, and Environment Awareness.
+- **Cognitive Stream**: Real-time `<think>` tag parsing for transparency.
+
+## 🛠️ Internal Toolset
+Goku Lite has direct access to the host environment via these core tools:
+- **`exec_command`**: Run shell commands on the Ubuntu host.
+- **`read_file` / `write_file`**: Complete filesystem management.
+- **`google_search`**: Real-time grounding and fact-checking.
+- **`memory_query`**: Persistent SQLite context retrieval.
+
 ---
 
 ## 📱 Usage & Management
@@ -95,6 +108,6 @@ Goku Lite is an open-source project. Feel free to submit PRs for new Tools, Inte
 ---
 
 ## 📜 Acknowledgements
-Goku Lite is built on the architectural philosophy and "Self-Becoming" principles of **[OpenClaw](https://github.com/OpenClaw)**. It aims to be a lightweight, cloud-native implementation of the OpenClaw agent stack.
+Goku Lite is a lightweight, cloud-native implementation of the **[Goku Orchestrator](https://github.com/elvisthebuilder/gokuu)**. It aims to bring the same sentient agency and professional utility to resource-constrained environments.
 
 **Built with ⚡ by Elvis The Builder.**

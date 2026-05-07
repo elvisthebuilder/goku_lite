@@ -62,7 +62,7 @@ class CloudHistory:
 
     def compact_history(self, session_id: str, summary: str, keep_count: int = 5):
         """
-        Implements OpenClaw-style compaction.
+        Implements history compaction.
         Keeps the latest 'keep_count' messages and replaces the rest with a summary.
         """
         with self.Session() as db:
