@@ -55,10 +55,32 @@ Goku Lite runs as a system service. Use these commands to manage the orchestrato
 - **`goku-lite-restart`**: Restart the orchestrator (use after config changes).
 - **`goku-lite-logs`**: Watch real-time logs to see Goku's thoughts.
 
-### Interactive Terminal
-- **`goku-lite-cli`**: Enter the high-fidelity terminal chat.
+### 🚀 Management Toolkit
+Goku Lite comes with a built-in suite of global commands for easy management:
 
-### Configuration
+| Command | Description |
+| :--- | :--- |
+| `goku-lite-help` | Show all available commands |
+| `goku-lite-cli` | Open the interactive chat terminal (Shortcut: `goku`) |
+| `goku-lite-update` | Pull the latest features and refresh dependencies |
+| `goku-lite-setup` | Reconfigure LLM, DB, or Cloud keys |
+| `goku-lite-total-reset` | Wipe all history and memories (Tabula Rasa) |
+| `goku-lite-start/stop` | Control the background orchestrator service |
+
+---
+
+### 🔄 Updating
+If you are an existing user, you can upgrade to the latest version by running:
+```bash
+sudo git pull origin main
+sudo ./install.sh
+```
+*(This will preserve your .env configuration while registering all new global commands.)*
+
+### 🏗️ Interactive Terminal
+- **`goku-lite-cli`**: Enter the high-fidelity terminal chat (Shortcut: `goku`).
+
+### ⚙️ Configuration
 - **`goku-lite-setup`**: Run the onboarding wizard to link cloud services.
 
 ### Messaging
