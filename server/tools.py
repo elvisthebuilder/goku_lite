@@ -201,6 +201,20 @@ class ToolRegistry:
                         }
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "set_persona",
+                    "description": "Change the active persona for the current session. Example: 'researcher', 'assistant', 'CORE'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "The name of the persona to activate."}
+                        },
+                        "required": ["name"]
+                    }
+                }
             }
         ]
 
@@ -383,6 +397,18 @@ class ToolRegistry:
             
             with open(tasks_file, "w") as f: json.dump(current_tasks, f)
             return f"Current Task List:\n" + "\n".join([f"{i}. {t}" for i, t in enumerate(current_tasks)]) if current_tasks else "Task list is empty."
+
+        elif tool_name == "set_persona":
+            name = args.get("name")
+            if not session_id: return "Error: No session ID provided."
+            from .personality_manager import personality_manager
+            
+            # Check if persona exists (if not CORE)
+            if name != "CORE" and name not in personality_manager.list_personalities():
+                return f"Error: Persona '{name}' not found. Please create it first by writing to ~/.goku/personalities/{name}.md"
+            
+            personality_manager.assign_personality(session_id, name)
+            return f"Persona for this session updated to: {name}. I will adopt this identity in my next response."
 
         return f"Unknown tool: {tool_name}"
 

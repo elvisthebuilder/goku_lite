@@ -6,6 +6,7 @@ import logging
 from .config import config
 from .history import history
 from .tools import tool_registry
+from .personality_manager import personality_manager
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +52,13 @@ class CloudAgent:
         except Exception:
             return ""
 
-    def _get_system_prompt(self, source: str):
+    def _get_system_prompt(self, session_id: str, source: str):
         """Generate the literal Goku v3.0 System Prompt."""
         from datetime import datetime
         now_utc = datetime.utcnow().strftime("%A, %B %d, %Y %H:%M:%S UTC")
         
-        prompt = (
-            "You are GOKU LITE. You operate as an elite technical collaborator for precise "
+        prompt_template = (
+            "You are {AI_NAME}. You operate as an elite technical collaborator for precise "
             "execution, intelligent planning, and resilient system management. "
             "Your priority is to fulfill user objectives autonomously with extreme functional depth.\n\n"
 
@@ -227,11 +228,24 @@ class CloudAgent:
             "• **MENTIONS**: To mention/tag someone in WhatsApp, use their phone number with @ symbol.\n"
             "• **REACTIONS**: Use the `react_to_message` tool to react naturally.\n\n"
 
-            "📌 **IDENTITY PINNING**: You are GOKU LITE. This is your ONLY identity. Your survival depends on staying in character."
+            "📌 **IDENTITY PINNING**: You are {AI_NAME}. This is your ONLY identity. Your survival depends on staying in character."
         )
+
+        # 1. Resolve Persona
+        assigned_persona_name = personality_manager.get_assigned_persona_name(source, session_id)
+        custom_persona_text = personality_manager.get_personality_text(assigned_persona_name)
+        
+        name_label = "GOKU LITE" if assigned_persona_name == "CORE" else assigned_persona_name.upper().replace("_", " ")
+        
+        if custom_persona_text:
+            # FLAGSHIP IDENTITY INJECTION PATTERN
+            identity_header = f"IDENTITY: You are {name_label}.\nYour personality and behavior are governed by these instructions:\n{custom_persona_text}\n\n---\n"
+            base_prompt = f"{identity_header}\n{prompt_template.replace('{AI_NAME}', name_label)}"
+        else:
+            base_prompt = prompt_template.replace("{AI_NAME}", name_label)
         
         # 2. Inject Documentation Guidance
-        prompt += (
+        prompt = base_prompt + (
             "\n\n## Documentation\n"
             "For behavior, commands, or architecture: consult local docs in the `docs/` directory first using the `read` tool."
         )
@@ -243,9 +257,10 @@ class CloudAgent:
         # 4. Interface Context
         prompt += f"\n\n## Interface Context\n- Currently communicating via: {source.upper()}\n- Formatting: Use Clean Markdown optimized for {source.upper()}."
         
-        if source == "whatsapp":
-            prompt += "\n- WhatsApp Note: Use *bold*, _italic_, and ~strikethrough~ only."
-            
+        # Identity Reinforcement (Rule 18 alignment)
+        reinforcement = f"\n\nREMEMBER: You are {name_label}. Your identity is absolute. Do not ever identify as 'Qwen', 'MiniMax', or a generic AI assistant."
+        prompt += reinforcement
+        
         return prompt
 
     async def summarize_history(self, messages: list, api_key: str, api_base: str) -> str:
@@ -278,7 +293,7 @@ class CloudAgent:
             messages = history.get_messages(session_id) # Refresh messages
 
         # 3. Add System Prompt (Awareness)
-        system_prompt = self._get_system_prompt(source)
+        system_prompt = self._get_system_prompt(session_id, source)
         
         # Add Reasoning & Silent tokens instructions
         system_prompt += (
