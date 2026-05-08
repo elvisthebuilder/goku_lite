@@ -265,8 +265,16 @@ class CloudAgent:
 
     async def summarize_history(self, messages: list, api_key: str, api_base: str) -> str:
         """Use the LLM to generate a concise summary of the conversation thus far."""
+        # Flagship Summarization Prompt
+        session_id = "summary_task" # Placeholder
+        assigned_persona = personality_manager.get_assigned_persona_name("system", session_id)
+        custom_persona_text = personality_manager.get_personality_text(assigned_persona)
+        persona_instruction = f"IDENTITY: You are {assigned_persona.upper()}."
+        if custom_persona_text:
+            persona_instruction += f"\nYour behavior is governed by these instructions:\n{custom_persona_text}"
+
         summary_prompt = [
-            {"role": "system", "content": "You are a memory compactor. Summarize the following conversation into a single paragraph. Focus on user preferences, tasks completed, and ongoing goals. Be concise."},
+            {"role": "system", "content": f"{persona_instruction}\n\nYour current internal task is to act as a summarization assistant. Summarize the following conversation in concise bullet points. Focus on key topics, questions, and decisions. Maintain your persona's tone if applicable, but keep it concise. Return ONLY the bullet points."},
             {"role": "user", "content": json.dumps(messages)}
         ]
         response = await litellm.acompletion(
@@ -298,9 +306,10 @@ class CloudAgent:
         # Add Reasoning & Silent tokens instructions
         system_prompt += (
             "\n\n## Internal Reasoning & Actions\n"
-            "- Use `<think>...</think>` tags for internal analysis before responding.\n"
-            "- **CRITICAL**: If you use a tool, you MUST NOT output any text outside the `<think>` tags. Your response should consist ONLY of the tool call. No narration like 'I will call...' or 'We need to...'.\n"
-            "- Only the content OUTSIDE the `<think>` tags is visible to the user.\n"
+            "• Use <think> tags for complex logic or internal planning.\n"
+            "• Keep thoughts silent and invisible to the end user.\n"
+            "• Always prioritize the final output message over thought narration.\n"
+            "- **CRITICAL**: If you use a tool, you MUST NOT output any text outside the <think> tags. Your response should consist ONLY of the tool call. No narration like 'I will call...' or 'We need to...'.\n"
             "- If you have nothing to say (e.g., background task done), respond with ONLY: `∅` (the null token)."
         )
         
@@ -378,10 +387,12 @@ class CloudAgent:
                     function_name = manual_tool_call['name']
                     function_args = manual_tool_call['arguments']
                     tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                    # Flagship Tool Wrapper
+                    wrapped_output = f"[SYSTEM_TOOL_DATA: Results for {function_name}]\n{tool_output}"
                     messages.append({
                         "role": "tool",
                         "name": function_name,
-                        "content": tool_output,
+                        "content": wrapped_output,
                         "tool_call_id": "manual_call" # Fallback ID
                     })
                 
@@ -438,6 +449,8 @@ class CloudAgent:
             return clean_content
             
         except Exception as e:
+            if "stuck in a loop" in str(e).lower():
+                return "I notice I may be stuck in a loop. What do you actually need from me right now?"
             logger.error(f"Cloud LLM Error: {e}")
             return f"Sorry, I encountered an error with the cloud brain: {e}"
 
