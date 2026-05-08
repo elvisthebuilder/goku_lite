@@ -40,7 +40,20 @@ class CloudHistory:
             pool_recycle=3600,
             connect_args={"sslmode": "require"} if "sqlite" not in self.url else {}
         )
-        Base.metadata.create_all(self.engine)
+        
+        # Retry DB initialization for Neon cold starts (auto-suspend)
+        import time
+        for attempt in range(1, 4):
+            try:
+                Base.metadata.create_all(self.engine)
+                break
+            except Exception as e:
+                if attempt == 3:
+                    logger.error(f"DB init failed after 3 attempts: {e}")
+                    raise
+                logger.warning(f"DB cold start attempt {attempt}/3 failed. Retrying in {attempt * 2}s...")
+                time.sleep(attempt * 2)
+                
         self.Session = sessionmaker(bind=self.engine)
 
     def add_message(self, session_id: str, role: str, content: str, msg_type: str = 'message'):
