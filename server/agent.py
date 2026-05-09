@@ -426,16 +426,20 @@ class CloudAgent:
                                 start = -1
                 
                 if not tool_calls and not manual_tool_calls:
-                    # Check if it tried to make a manual call but failed syntax
-                    if "{" in message.content and ('"name"' in message.content or '"function"' in message.content):
-                        yield "⚙️ *Correcting JSON syntax...*"
+                    # Check if it tried to make a manual call but failed syntax, or cut off abruptly
+                    content_stripped = message.content.strip()
+                    is_malformed_json = "{" in message.content and ("name" in message.content or "function" in message.content)
+                    is_cutoff = content_stripped.endswith(":") or content_stripped.endswith("```json") or content_stripped.endswith("```")
+                    
+                    if is_malformed_json or is_cutoff:
+                        yield "⚙️ *Correcting AI sequence...*"
                         messages.append({
                             "role": "assistant",
                             "content": message.content
                         })
                         messages.append({
                             "role": "user",
-                            "content": "System Error: Your JSON tool call failed to parse. Please ensure all strings have closing quotes and proper escaping."
+                            "content": "System Error: Your response cut off abruptly or your JSON tool call failed to parse. Please complete your thought and ensure your JSON tool calls use strict double quotes and proper escaping."
                         })
                         continue
                         
