@@ -6,7 +6,7 @@ After=network.target
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/goku-lite
-Environment="PATH=/opt/goku-lite/venv/bin"
+Environment="PATH=/opt/goku-lite/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/opt/goku-lite/venv/bin/python main.py
 Restart=always
 RestartSec=5
