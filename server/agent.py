@@ -382,8 +382,8 @@ class CloudAgent:
             if not api_key:
                 api_key = config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
 
-            # 6. Continuous Tool Execution Loop (Max 7 Iterations)
-            max_iterations = 7
+            # 6. Continuous Tool Execution Loop (Max 10 Iterations)
+            max_iterations = 10
             iteration = 0
             final_content = None
             
@@ -496,8 +496,20 @@ class CloudAgent:
                         "content": f"System Tool Execution Results:{combined_tool_output}"
                     })
                     
-            if not final_content and iteration > 1:
-                final_content = "✅ Task chain executed successfully."
+            if (not final_content or not final_content.strip()) and iteration > 1:
+                # Force a final summary completion if the AI went silent after tools
+                try:
+                    logger.info("Forcing final summary completion...")
+                    messages.append({"role": "user", "content": "The tools have finished. Please provide a concise final summary of what you did for the user."})
+                    summary_resp = await litellm.acompletion(
+                        model=self.model,
+                        messages=messages,
+                        api_key=api_key,
+                        api_base=api_base
+                    )
+                    final_content = summary_resp.choices[0].message.content
+                except:
+                    final_content = "✅ Task chain executed successfully."
             
             # 7. Post-Process (Cognitive Stream & Intent Stripping)
             import re
