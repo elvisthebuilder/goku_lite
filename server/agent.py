@@ -382,74 +382,51 @@ class CloudAgent:
             if not api_key:
                 api_key = config.OPENAI_API_KEY or config.ANTHROPIC_API_KEY or config.GEMINI_API_KEY
 
-            response = await litellm.acompletion(
-                model=self.model,
-                messages=messages,
-                tools=tool_registry.tools,
-                tool_choice="auto",
-                api_key=api_key,
-                api_base=api_base
-            )
+            # 6. Continuous Tool Execution Loop (Max 7 Iterations)
+            max_iterations = 7
+            iteration = 0
+            final_content = None
             
-            message = response.choices[0].message
-            
-            # 6. Handle Tool Calls (Native Schema)
-            tool_calls = getattr(message, 'tool_calls', None)
-            manual_tool_call = None
-            
-            # Fallback: Catch models that output JSON as text (common in Qwen/Ollama)
-            if not tool_calls and message.content:
-                import re
-                json_match = re.search(r'\{.*"name".*".*".*"arguments".*\{.*\}.*\}', message.content, re.DOTALL)
-                if json_match:
-                    try:
-                        manual_tool_call = json.loads(json_match.group())
-                        logger.info(f"Intercepted manual JSON tool call: {manual_tool_call['name']}")
-                    except:
-                        pass
-
-            if tool_calls or manual_tool_call:
-                messages.append(message)
+            while iteration < max_iterations:
+                iteration += 1
                 
-                # Execute Native Tool Calls
-                if tool_calls:
-                    for tool_call in tool_calls:
-                        function_name = tool_call.function.name
-                        function_args = json.loads(tool_call.function.arguments)
-                        tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
-                        messages.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": tool_output,
-                        })
-                
-                # Execute Manual (Hallucinated) Tool Call
-                if manual_tool_call:
-                    function_name = manual_tool_call['name']
-                    function_args = manual_tool_call['arguments']
-                    tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
-                    # Flagship Tool Wrapper
-                    wrapped_output = f"[SYSTEM_TOOL_DATA: Results for {function_name}]\n{tool_output}"
-                    messages.append({
-                        "role": "tool",
-                        "name": function_name,
-                        "content": wrapped_output,
-                        "tool_call_id": "manual_call" # Fallback ID
-                    })
-                
-                second_response = await litellm.acompletion(
+                response = await litellm.acompletion(
                     model=self.model,
                     messages=messages,
                     tools=tool_registry.tools,
+                    tool_choice="auto",
                     api_key=api_key,
                     api_base=api_base
                 )
-                final_content = second_response.choices[0].message.content
-                if not final_content:
-                    final_content = "✅ Task executed successfully."
-            else:
-                final_content = message.content
+                
+                message = response.choices[0].message
+                tool_calls = getattr(message, 'tool_calls', None)
+                
+                if not tool_calls:
+                    final_content = message.content
+                    break
+                    
+                # We have tool calls. Append the assistant message with tool_calls for strict API schemas
+                messages.append(message)
+                
+                # Execute Native Tool Calls
+                for tool_call in tool_calls:
+                    function_name = tool_call.function.name
+                    try:
+                        function_args = json.loads(tool_call.function.arguments)
+                        tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                    except Exception as e:
+                        tool_output = f"Error executing {function_name}: {e}"
+                        
+                    messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": function_name,
+                        "content": str(tool_output),
+                    })
+                    
+            if not final_content and iteration > 1:
+                final_content = "✅ Task chain executed successfully."
             
             # 7. Post-Process (Cognitive Stream & Intent Stripping)
             import re
