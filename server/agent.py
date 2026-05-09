@@ -405,7 +405,6 @@ class CloudAgent:
                 
                 # Fallback: Catch Ollama models outputting multiple JSON tool calls as raw text
                 if not tool_calls and message.content:
-                    import json
                     depth = 0
                     start = -1
                     for i, char in enumerate(message.content):
