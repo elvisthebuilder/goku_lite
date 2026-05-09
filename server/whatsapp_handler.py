@@ -26,6 +26,8 @@ async def start_whatsapp_bot():
                 has_response = False
                 async for partial_response in agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp"):
                     if partial_response:
+                        if partial_response.startswith("⚙️"):
+                            continue
                         has_response = True
                         client.send_message(message.Info.MessageSource.Chat, partial_response)
                         

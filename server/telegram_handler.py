@@ -128,17 +128,37 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
             generator = agent.chat(combined_text, session_id=f"tg_{chat_id}", source="telegram")
             
             has_response = False
+            transient_message = None
+            
             async for partial_response in generator:
                 if partial_response:
                     has_response = True
-                    chunks = split_message(partial_response)
-                    for i, chunk in enumerate(chunks):
-                        try:
-                            await reply_to_message.reply_text(chunk, parse_mode="Markdown")
-                        except Exception:
-                            await reply_to_message.reply_text(chunk)
-                        if len(chunks) > 1:
-                            await asyncio.sleep(0.3)
+                    is_transient = partial_response.startswith("⚙️")
+                    
+                    if is_transient:
+                        if not transient_message:
+                            transient_message = await reply_to_message.reply_text(partial_response, parse_mode="Markdown")
+                        else:
+                            try:
+                                await transient_message.edit_text(partial_response, parse_mode="Markdown")
+                            except Exception:
+                                pass
+                    else:
+                        if transient_message:
+                            try:
+                                await transient_message.delete()
+                            except Exception:
+                                pass
+                            transient_message = None
+                            
+                        chunks = split_message(partial_response)
+                        for i, chunk in enumerate(chunks):
+                            try:
+                                await reply_to_message.reply_text(chunk, parse_mode="Markdown")
+                            except Exception:
+                                await reply_to_message.reply_text(chunk)
+                            if len(chunks) > 1:
+                                await asyncio.sleep(0.3)
                             
             await asyncio.sleep(0.5)
             stop_typing.set()
