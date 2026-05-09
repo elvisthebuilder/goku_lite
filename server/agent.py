@@ -260,7 +260,26 @@ class CloudAgent:
         prompt += self._get_skills_registry()
         
         # 4. Interface Context
-        prompt += f"\n\n## Interface Context\n- Currently communicating via: {source.upper()}\n- Formatting: Use Clean Markdown optimized for {source.upper()}."
+        if source == "whatsapp":
+            prompt += (
+                "\n\n## Interface Context\n"
+                "- Currently communicating via: WHATSAPP\n"
+                "- Use *bold*, _italic_, `code`, and ``` code blocks ```.\n"
+                "- NEVER use markdown tables (│ col1 │ col2 │) — they do NOT render on WhatsApp. Use bullet lists instead.\n"
+                "- NEVER use horizontal line separators (---, ===, ━━━, ———) — they appear as raw characters.\n"
+                "- Keep layout clean and vertical for mobile ease."
+            )
+        elif source == "telegram":
+            prompt += (
+                "\n\n## Interface Context\n"
+                "- Currently communicating via: TELEGRAM\n"
+                "- Use **bold**, bullet lists, `inline code`, and ``` code blocks ```.\n"
+                "- NEVER use markdown tables (│ col1 │ col2 │) — they do NOT render on Telegram. Use bullet lists instead.\n"
+                "- NEVER use horizontal line separators (---, ===, ━━━, ———) — they appear as raw characters on mobile.\n"
+                "- Keep paragraphs short (2-3 sentences max). Messages over 4096 chars will be split."
+            )
+        else:
+            prompt += f"\n\n## Interface Context\n- Currently communicating via: {source.upper()}\n- Formatting: Use Clean Markdown optimized for {source.upper()}."
         
         # Identity Reinforcement (Rule 18 alignment)
         reinforcement = f"\n\nREMEMBER: You are {name_label}. Your identity is absolute. Do not ever identify as 'Qwen', 'MiniMax', or a generic AI assistant."
