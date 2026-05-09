@@ -11,6 +11,18 @@ from dotenv import load_dotenv
 
 console = Console()
 
+def get_existing_value(key):
+    """Load the existing value of a key from the .env file."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(base_dir, ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(f"{key}="):
+                    return line[len(key)+1:]
+    return ""
+
 def save_to_env(key, value):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     env_path = os.path.join(base_dir, ".env")
@@ -31,12 +43,24 @@ def save_to_env(key, value):
     if not found:
         new_lines.append(f"{key}={value}\n")
     
+    new_content = "".join(new_lines)
+    
     try:
         with open(env_path, "w") as f:
             f.writelines(new_lines)
     except PermissionError:
-        print(f"❌ Error: Permission denied to write to {env_path}")
-        sys.exit(1)
+        # Fallback: use sudo tee (works on EC2 where /opt is root-owned)
+        import subprocess
+        result = subprocess.run(
+            ["sudo", "tee", env_path],
+            input=new_content,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            print(f"❌ Error: Could not write to {env_path} even with sudo.")
+            print(f"   Run: sudo goku-lite-setup")
+            sys.exit(1)
 
 async def test_db(url):
     try:
@@ -68,32 +92,41 @@ async def setup_llm():
     if not provider: return False
 
     if provider == "OpenAI":
-        key = await questionary.password("Enter OpenAI API Key:").ask_async()
+        existing = get_existing_value("OPENAI_API_KEY")
+        key = await questionary.password("Enter OpenAI API Key:", default=existing).ask_async()
         if not key: return False
         save_to_env("OPENAI_API_KEY", key)
         save_to_env("GOKU_MODEL", "gpt-4o-mini")
     elif provider == "Gemini":
-        key = await questionary.password("Enter Google/Gemini API Key:").ask_async()
+        existing = get_existing_value("GEMINI_API_KEY")
+        key = await questionary.password("Enter Google/Gemini API Key:", default=existing).ask_async()
         if not key: return False
         save_to_env("GEMINI_API_KEY", key)
         save_to_env("GOKU_MODEL", "gemini/gemini-2.5-flash")
     elif provider == "Anthropic":
-        key = await questionary.password("Enter Anthropic API Key:").ask_async()
+        existing = get_existing_value("ANTHROPIC_API_KEY")
+        key = await questionary.password("Enter Anthropic API Key:", default=existing).ask_async()
         if not key: return False
         save_to_env("ANTHROPIC_API_KEY", key)
         save_to_env("GOKU_MODEL", "claude-3-haiku-20240307")
     elif provider == "Ollama (Cloud/Remote)":
+        existing_url = get_existing_value("OLLAMA_API_BASE") or "https://ollama.com"
+        existing_model = get_existing_value("GOKU_MODEL") or "ollama/gpt-oss:120b-cloud"
         url = await questionary.text(
-            "Enter Ollama API Endpoint (Base URL):", 
-            default="https://ollama.com",
+            "Enter Ollama API Endpoint (Base URL):",
+            default=existing_url,
             instruction="Tip: Use https://ollama.com for Ollama Cloud (I'll handle the /api part)."
         ).ask_async()
         if not url: return False
-        key = await questionary.password("Enter API Key (Optional):").ask_async()
-        model = await questionary.text("Enter Ollama Model Name:", default="ollama/gpt-oss:120b-cloud").ask_async()
+        key = await questionary.password("Enter API Key (leave blank to keep existing):").ask_async()
+        model = await questionary.text("Enter Ollama Model Name:", default=existing_model).ask_async()
         if not model: return False
         save_to_env("OLLAMA_API_BASE", url)
-        if key: save_to_env("OLLAMA_API_KEY", key)
+        existing_key = get_existing_value("OLLAMA_API_KEY")
+        if key:
+            save_to_env("OLLAMA_API_KEY", key)
+        elif existing_key:
+            console.print("[dim]API Key unchanged.[/]")
         save_to_env("GOKU_MODEL", model)
     return True
 
