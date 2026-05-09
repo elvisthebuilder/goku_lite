@@ -106,8 +106,9 @@ async def main():
             from rich.live import Live
             
             with console.status("[bold yellow]Goku is thinking...[/]") as status:
-                response = await agent.chat(user_input, session_id=session_id, source="cli")
+                generator = agent.chat(user_input, session_id=session_id, source="cli")
                 
+            async for response in generator:
                 if response:
                     import re
                     # Extract thinking blocks
@@ -132,8 +133,6 @@ async def main():
                     # 2. Render the Final Response (Permanent)
                     if clean_response and clean_response != "∅":
                         console.print(Panel(clean_response, title="[bold dragon]Goku[/]", border_style="cyan"))
-                else:
-                    pass
             
         except KeyboardInterrupt:
             break

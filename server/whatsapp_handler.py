@@ -23,13 +23,13 @@ async def start_whatsapp_bot():
             
             try:
                 # 1. Chat with Agent (using WhatsApp session)
-                response = await agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp")
-                
-                # 2. Silent Turn Handling
-                if response:
-                    # WhatsApp doesn't support full Markdown, so we ensure it's clean
-                    client.send_message(message.Info.MessageSource.Chat, response)
-                else:
+                has_response = False
+                async for partial_response in agent.chat(user_text, session_id=f"wa_{chat_id}", source="whatsapp"):
+                    if partial_response:
+                        has_response = True
+                        client.send_message(message.Info.MessageSource.Chat, partial_response)
+                        
+                if not has_response:
                     logger.info(f"Agent is silent for WhatsApp user {chat_id}.")
             except Exception as e:
                 logger.error(f"WhatsApp Handler Error: {e}")

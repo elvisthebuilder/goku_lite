@@ -125,25 +125,26 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
             await asyncio.sleep(1.0)  # Reading pause
             logger.info(f"🤖 Goku is thinking for {chat_id}...")
 
-            response = await asyncio.wait_for(
-                agent.chat(combined_text, session_id=f"tg_{chat_id}", source="telegram"),
-                timeout=90
-            )
-
+            generator = agent.chat(combined_text, session_id=f"tg_{chat_id}", source="telegram")
+            
+            has_response = False
+            async for partial_response in generator:
+                if partial_response:
+                    has_response = True
+                    chunks = split_message(partial_response)
+                    for i, chunk in enumerate(chunks):
+                        try:
+                            await reply_to_message.reply_text(chunk, parse_mode="Markdown")
+                        except Exception:
+                            await reply_to_message.reply_text(chunk)
+                        if len(chunks) > 1:
+                            await asyncio.sleep(0.3)
+                            
             await asyncio.sleep(0.5)
             stop_typing.set()
             await typing_task
 
-            if response:
-                chunks = split_message(response)
-                for i, chunk in enumerate(chunks):
-                    try:
-                        await reply_to_message.reply_text(chunk, parse_mode="Markdown")
-                    except Exception:
-                        await reply_to_message.reply_text(chunk)
-                    if len(chunks) > 1:
-                        await asyncio.sleep(0.3)
-            else:
+            if not has_response:
                 logger.info("Agent is silent. No response sent to Telegram.")
 
         except asyncio.TimeoutError:

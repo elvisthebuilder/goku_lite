@@ -327,7 +327,7 @@ class CloudAgent:
         )
         return response.choices[0].message.content or "No summary generated."
 
-    async def chat(self, user_input: str, session_id: str = "default", source: str = "cli"):
+    async def chat(self, user_input: str, session_id: str = "default", source: str = "cli") -> AsyncGenerator[str, None]:
         # 1. Get history
         messages = history.get_messages(session_id)
         
@@ -411,7 +411,8 @@ class CloudAgent:
                         try:
                             import json
                             manual_tool_call = json.loads(json_match.group())
-                            logger.info(f"Intercepted manual JSON tool call: {manual_tool_call['name']}")
+                            name = manual_tool_call.get('name') or manual_tool_call.get('function', {}).get('name', 'Unknown')
+                            logger.info(f"Intercepted manual JSON tool call: {name}")
                         except:
                             pass
                 
@@ -424,6 +425,7 @@ class CloudAgent:
                     messages.append(message)
                     for tool_call in tool_calls:
                         function_name = tool_call.function.name
+                        yield f"⚙️ *Executing:* `{function_name}`..."
                         try:
                             function_args = json.loads(tool_call.function.arguments)
                             tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
@@ -439,8 +441,16 @@ class CloudAgent:
                         
                 # Execute Manual JSON Tool Calls (Spoofing Native Schema to prevent API errors)
                 elif manual_tool_call:
-                    function_name = manual_tool_call['name']
-                    function_args = manual_tool_call['arguments']
+                    function_name = manual_tool_call.get('name') or manual_tool_call.get('function', {}).get('name')
+                    function_args = manual_tool_call.get('arguments') or manual_tool_call.get('function', {}).get('arguments')
+                    
+                    if not function_name:
+                        yield f"⚠️ Failed to parse tool call format."
+                        break
+                        
+                    yield f"⚙️ *Executing:* `{function_name}`..."
+
+                    yield f"⚙️ *Executing:* `{function_name}`..."
                     try:
                         tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
                     except Exception as e:
@@ -474,7 +484,7 @@ class CloudAgent:
             # 7. Post-Process (Cognitive Stream & Intent Stripping)
             import re
             if not final_content:
-                return None
+                return
             
             # 1. Narration Stripper — only strip BARE narration-only lines (pre-tool intent).
             # These are lines that consist ENTIRELY of intent narration with no real content.
@@ -508,18 +518,18 @@ class CloudAgent:
                 # If there are thoughts but no speech, return just the thoughts
                 if "<think>" in clean_content:
                     return clean_content
-                return None
+                return
             
             # 8. Save final response
             if clean_content:
                 history.add_message(session_id, "assistant", clean_content)
             
-            return clean_content
+            yield clean_content
             
         except Exception as e:
             if "stuck in a loop" in str(e).lower():
                 return "I notice I may be stuck in a loop. What do you actually need from me right now?"
             logger.error(f"Cloud LLM Error: {e}")
-            return f"Sorry, I encountered an error with the cloud brain: {e}"
+            yield f"Sorry, I encountered an error with the cloud brain: {e}"
 
 agent = CloudAgent()
