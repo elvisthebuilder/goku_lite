@@ -1,4 +1,5 @@
 import os
+import asyncio
 import httpx
 import logging
 import subprocess
@@ -321,14 +322,31 @@ class ToolRegistry:
 
         elif tool_name == "get_system_metrics":
             try:
-                import subprocess
-                # RAM
-                ram = subprocess.check_output(["free", "-m"]).decode()
-                # DISK
-                disk = subprocess.check_output(["df", "-h", "/"]).decode()
-                # DATE
-                date = subprocess.check_output(["date"]).decode()
-                return f"REAL SYSTEM METRICS:\n\nRAM:\n{ram}\nDISK:\n{disk}\nCURRENT TIME:\n{date}"
+                # RAM via /proc/meminfo — no 'free' binary needed
+                mem_info = {}
+                with open("/proc/meminfo") as f:
+                    for line in f:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            mem_info[parts[0].rstrip(":")] = int(parts[1])
+                total_mb = mem_info.get("MemTotal", 0) // 1024
+                avail_mb = mem_info.get("MemAvailable", 0) // 1024
+                used_mb  = total_mb - avail_mb
+                ram_str  = f"{'':>12}total        used        free\nMem:{total_mb:>12}       {used_mb:>8}       {avail_mb:>8}"
+
+                # Disk via os.statvfs
+                st = os.statvfs("/")
+                total_gb = (st.f_blocks * st.f_frsize) / (1024 ** 3)
+                free_gb  = (st.f_bavail * st.f_frsize) / (1024 ** 3)
+                used_gb  = total_gb - free_gb
+                pct = int((used_gb / total_gb) * 100) if total_gb else 0
+                disk_str = f"Filesystem      Size  Used Avail Use%\n/               {total_gb:.0f}G  {used_gb:.1f}G  {free_gb:.1f}G  {pct}%"
+
+                # Date from Python
+                from datetime import datetime
+                date = datetime.utcnow().strftime("%a %b %d %H:%M:%S UTC %Y")
+
+                return f"REAL SYSTEM METRICS:\n\nRAM (MB):\n{ram_str}\n\nDISK:\n{disk_str}\n\nCURRENT TIME:\n{date}"
             except Exception as e:
                 return f"Failed to fetch metrics: {e}"
 

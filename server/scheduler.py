@@ -20,17 +20,30 @@ async def _push_message(message: str):
     await send_proactive_message(chat_id=owner_id, text=message)
 
 async def get_system_report():
-    """Fetch raw system metrics via shell for maximum reliability."""
-    import subprocess
+    """Fetch raw system metrics via /proc — no external binaries required."""
     ram = "Unknown"
     disk = "Unknown"
     try:
-        # RAM
-        free = subprocess.check_output("free -h", shell=True).decode().split("\n")[1].split()
-        ram = f"{free[2]} used / {free[1]} total"
-        # Disk
-        df = subprocess.check_output("df -h /", shell=True).decode().split("\n")[1].split()
-        disk = f"{df[2]} used / {df[1]} total ({df[4]})"
+        # RAM via /proc/meminfo
+        mem_info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    mem_info[parts[0].rstrip(":")] = int(parts[1])
+        total_mb = mem_info.get("MemTotal", 0) // 1024
+        avail_mb = mem_info.get("MemAvailable", 0) // 1024
+        used_mb  = total_mb - avail_mb
+        ram = f"{used_mb}MB used / {total_mb}MB total"
+
+        # Disk via os.statvfs
+        import os
+        st = os.statvfs("/")
+        total_gb = (st.f_blocks * st.f_frsize) / (1024 ** 3)
+        free_gb  = (st.f_bavail * st.f_frsize) / (1024 ** 3)
+        used_gb  = total_gb - free_gb
+        pct = int((used_gb / total_gb) * 100) if total_gb else 0
+        disk = f"{used_gb:.1f}GB used / {total_gb:.1f}GB total ({pct}%)"
     except Exception as e:
         logger.error(f"Failed to fetch metrics: {e}")
     return ram, disk
@@ -71,34 +84,43 @@ _last_disk_percent = None
 
 async def _health_check():
     """Check server health and alert if something is wrong or increasing rapidly."""
-    import subprocess
+    import os
     global _last_ram_percent, _last_disk_percent
-    
+
     try:
-        # 1. Check RAM
-        free = subprocess.check_output(["free", "-m"]).decode().split("\n")[1].split()
-        total_ram = int(free[1])
-        used_ram = int(free[2])
+        # 1. Check RAM via /proc/meminfo
+        mem_info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    mem_info[parts[0].rstrip(":")] = int(parts[1])
+        total_ram = mem_info.get("MemTotal", 1)
+        avail_ram = mem_info.get("MemAvailable", 0)
+        used_ram  = total_ram - avail_ram
         ram_percent = (used_ram / total_ram) * 100
 
         # Detect RAM Spike
         if _last_ram_percent is not None:
             spike = ram_percent - _last_ram_percent
-            if spike > 20: # 20% jump in 10 mins
+            if spike > 20:
                 await _push_message(f"⚠️ *Rapid RAM Increase:* Memory usage just jumped by {spike:.0f}% in the last 10 minutes! Something might be leaking.")
 
         if ram_percent > 85:
             await _push_message(f"🚨 *High Memory Alert:* {ram_percent:.0f}% used. System is at risk of crashing.")
-        
+
         _last_ram_percent = ram_percent
 
-        # 2. Check Disk
-        df = subprocess.check_output(["df", "-h", "/"]).decode().split("\n")[1].split()
-        disk_percent = int(df[4].replace("%", ""))
+        # 2. Check Disk via os.statvfs
+        st = os.statvfs("/")
+        total_disk = st.f_blocks * st.f_frsize
+        free_disk  = st.f_bavail * st.f_frsize
+        disk_percent = int(((total_disk - free_disk) / total_disk) * 100) if total_disk else 0
+        free_gb = free_disk / (1024 ** 3)
 
         if disk_percent > 90:
-            await _push_message(f"🚨 *Critical Disk Alert:* {disk_percent}% used. Only {df[3]} left! I might stop being able to save logs soon.")
-        
+            await _push_message(f"🚨 *Critical Disk Alert:* {disk_percent}% used. Only {free_gb:.1f}GB left! I might stop being able to save logs soon.")
+
         _last_disk_percent = disk_percent
 
     except Exception as e:

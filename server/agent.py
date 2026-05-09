@@ -32,16 +32,34 @@ class CloudAgent:
         return registry
 
     def _get_runtime_info(self) -> str:
-        """Get real-time system metrics for the prompt."""
+        """Get real-time system metrics using /proc — no external binaries needed."""
         try:
-            import subprocess
-            # Get RAM usage
-            ram = subprocess.check_output("free -h | awk '/^Mem:/ {print $3 \"/\" $2}'", shell=True).decode().strip()
-            # Get Disk usage
-            disk = subprocess.check_output("df -h / | awk 'NR==2 {print $3 \"/\" $2}'", shell=True).decode().strip()
-            # Get uptime
-            uptime = subprocess.check_output("uptime -p", shell=True).decode().strip()
-            
+            # RAM via /proc/meminfo (always available on Linux)
+            mem_info = {}
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        mem_info[parts[0].rstrip(":")] = int(parts[1])
+            total_kb  = mem_info.get("MemTotal", 0)
+            avail_kb  = mem_info.get("MemAvailable", 0)
+            used_kb   = total_kb - avail_kb
+            ram = f"{used_kb // 1024}MB / {total_kb // 1024}MB"
+
+            # Disk via os.statvfs — pure Python, no df needed
+            import os
+            st = os.statvfs("/")
+            total_gb = (st.f_blocks * st.f_frsize) / (1024 ** 3)
+            free_gb  = (st.f_bavail * st.f_frsize) / (1024 ** 3)
+            used_gb  = total_gb - free_gb
+            disk = f"{used_gb:.1f}GB / {total_gb:.1f}GB"
+
+            # Uptime via /proc/uptime
+            with open("/proc/uptime") as f:
+                secs = float(f.read().split()[0])
+            h, m = divmod(int(secs) // 60, 60)
+            uptime = f"up {h}h {m}m"
+
             return (
                 "\n\n## System Runtime\n"
                 f"- **RAM**: {ram}\n"
@@ -435,15 +453,14 @@ class CloudAgent:
             if not final_content:
                 return None
             
-            # 1. Broaden Hallucination/Narration Stripper
-            # We catch ANY phrase where he narrates technical intent outside think tags.
+            # 1. Narration Stripper — only strip BARE narration-only lines (pre-tool intent).
+            # These are lines that consist ENTIRELY of intent narration with no real content.
             narration_patterns = [
-                r"(?i)(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform).*",
-                r"(?i)Calling function.*",
-                r"(?i)Using tool.*",
-                r"(?i)Reading file.*",
-                r"(?i)Issuing calls.*",
-                r"(?i)We'll issue calls.*"
+                r"^(?i)(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform)[^\n]*$",
+                r"^(?i)Calling function[^\n]*$",
+                r"^(?i)Using tool[^\n]*$",
+                r"^(?i)Reading file[^\n]*$",
+                r"^(?i)(?:We'll|I'll) issue calls?[^\n]*$",
             ]
             
             # Preserve <think> blocks while stripping narration from the visible speech.
@@ -453,10 +470,14 @@ class CloudAgent:
                 if part.startswith('<think>'):
                     cleaned_parts.append(part)
                 else:
-                    p = part
-                    for pattern in narration_patterns:
-                        p = re.sub(pattern, '', p).strip()
-                    cleaned_parts.append(p)
+                    lines = part.split('\n')
+                    kept = []
+                    for line in lines:
+                        stripped = line.strip()
+                        if any(re.match(p, stripped) for p in narration_patterns):
+                            continue  # drop pure-narration lines only
+                        kept.append(line)
+                    cleaned_parts.append('\n'.join(kept))
             
             clean_content = "".join(cleaned_parts).strip()
             
