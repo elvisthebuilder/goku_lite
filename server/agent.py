@@ -426,6 +426,19 @@ class CloudAgent:
                                 start = -1
                 
                 if not tool_calls and not manual_tool_calls:
+                    # Check if it tried to make a manual call but failed syntax
+                    if "{" in message.content and ('"name"' in message.content or '"function"' in message.content):
+                        yield "⚙️ *Correcting JSON syntax...*"
+                        messages.append({
+                            "role": "assistant",
+                            "content": message.content
+                        })
+                        messages.append({
+                            "role": "user",
+                            "content": "System Error: Your JSON tool call failed to parse. Please ensure all strings have closing quotes and proper escaping."
+                        })
+                        continue
+                        
                     final_content = message.content
                     break
                     
