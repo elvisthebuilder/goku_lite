@@ -519,11 +519,9 @@ class CloudAgent:
             
             # 7. Post-Process (Cognitive Stream & Intent Stripping)
             import re
-            if not final_content:
-                return
+            clean_content = final_content
             
             # 1. Narration Stripper — only strip BARE narration-only lines (pre-tool intent).
-            # These are lines that consist ENTIRELY of intent narration with no real content.
             narration_patterns = [
                 r"(?i)^(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform)[^\n]*$",
                 r"(?i)^Calling function[^\n]*$",
