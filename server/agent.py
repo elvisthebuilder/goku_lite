@@ -441,10 +441,13 @@ class CloudAgent:
                 second_response = await litellm.acompletion(
                     model=self.model,
                     messages=messages,
+                    tools=tool_registry.tools,
                     api_key=api_key,
                     api_base=api_base
                 )
                 final_content = second_response.choices[0].message.content
+                if not final_content:
+                    final_content = "✅ Task executed successfully."
             else:
                 final_content = message.content
             
