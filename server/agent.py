@@ -456,11 +456,11 @@ class CloudAgent:
             # 1. Narration Stripper — only strip BARE narration-only lines (pre-tool intent).
             # These are lines that consist ENTIRELY of intent narration with no real content.
             narration_patterns = [
-                r"^(?i)(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform)[^\n]*$",
-                r"^(?i)Calling function[^\n]*$",
-                r"^(?i)Using tool[^\n]*$",
-                r"^(?i)Reading file[^\n]*$",
-                r"^(?i)(?:We'll|I'll) issue calls?[^\n]*$",
+                r"(?i)^(?:I|We) (?:will|need to|shall|am going to|must|should) (?:call|use|run|execute|read|check|audit|access|look at|perform)[^\n]*$",
+                r"(?i)^Calling function[^\n]*$",
+                r"(?i)^Using tool[^\n]*$",
+                r"(?i)^Reading file[^\n]*$",
+                r"(?i)^(?:We'll|I'll) issue calls?[^\n]*$",
             ]
             
             # Preserve <think> blocks while stripping narration from the visible speech.
