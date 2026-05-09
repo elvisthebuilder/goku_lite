@@ -19,11 +19,13 @@ class CloudAgent:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         skills_dir = os.path.join(base_dir, "skills")
         if not os.path.exists(skills_dir):
-            return ""
+            yield ""
+            return
         
         skills = [f for f in os.listdir(skills_dir) if f.endswith(".md")]
         if not skills:
-            return ""
+            yield ""
+            return
         
         registry = "\n\n## Available Skills\n"
         registry += "You have these skill extensions available. You can read them using `read_file('skills/filename.md')` to activate their logic:\n"
@@ -68,7 +70,8 @@ class CloudAgent:
                 "- **Platform**: AWS EC2 (Ubuntu)\n"
             )
         except Exception:
-            return ""
+            yield ""
+            return
 
     def _get_system_prompt(self, session_id: str, source: str):
         """Generate the literal Goku v3.0 System Prompt."""
@@ -529,7 +532,8 @@ class CloudAgent:
             
         except Exception as e:
             if "stuck in a loop" in str(e).lower():
-                return "I notice I may be stuck in a loop. What do you actually need from me right now?"
+                yield "I notice I may be stuck in a loop. What do you actually need from me right now?"
+            return
             logger.error(f"Cloud LLM Error: {e}")
             yield f"Sorry, I encountered an error with the cloud brain: {e}"
 
