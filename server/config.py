@@ -22,6 +22,10 @@ class Config:
         # Scheduler defaults (Only managed via goku_settings.json now)
         self.BRIEFING_HOUR = 8
         self.BRIEFING_MINUTE = 0
+        self.AFTERNOON_HOUR = 14
+        self.AFTERNOON_MINUTE = 0
+        self.EVENING_HOUR = 20
+        self.EVENING_MINUTE = 0
 
         # Load autonomous overrides
         self._load_overrides()
@@ -36,6 +40,10 @@ class Config:
                     overrides = json.load(f)
                     self.BRIEFING_HOUR = overrides.get("briefing_hour", self.BRIEFING_HOUR)
                     self.BRIEFING_MINUTE = overrides.get("briefing_minute", self.BRIEFING_MINUTE)
+                    self.AFTERNOON_HOUR = overrides.get("afternoon_hour", self.AFTERNOON_HOUR)
+                    self.AFTERNOON_MINUTE = overrides.get("afternoon_minute", self.AFTERNOON_MINUTE)
+                    self.EVENING_HOUR = overrides.get("evening_hour", self.EVENING_HOUR)
+                    self.EVENING_MINUTE = overrides.get("evening_minute", self.EVENING_MINUTE)
         except Exception:
             pass
 

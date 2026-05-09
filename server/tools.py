@@ -350,13 +350,17 @@ class ToolRegistry:
             except Exception as e:
                 return f"Failed to fetch metrics: {e}"
 
-        elif tool_name == "update_briefing_time":
+        elif tool_name == "update_schedule":
+            slot = args.get("slot", "morning").lower() # morning, afternoon, evening
             hour = args.get("hour")
             minute = args.get("minute")
             
+            if slot not in ["morning", "afternoon", "evening"]:
+                return f"Error: Invalid slot '{slot}'. Use 'morning', 'afternoon', or 'evening'."
+            
             # 1. Update live scheduler
-            from .scheduler import set_briefing_time
-            set_briefing_time(hour, minute)
+            from .scheduler import set_schedule_time
+            set_schedule_time(slot, hour, minute)
             
             # 2. Persist to goku_settings.json (Safe Storage)
             try:
@@ -368,15 +372,15 @@ class ToolRegistry:
                     with open(settings_path, "r") as f:
                         settings = json.load(f)
                 
-                settings["briefing_hour"] = hour
-                settings["briefing_minute"] = minute
+                settings[f"{slot}_hour"] = hour
+                settings[f"{slot}_minute"] = minute
                 
                 with open(settings_path, "w") as f:
                     json.dump(settings, f, indent=4)
                     
-                return f"I've updated my morning briefing to {hour:02d}:{minute:02d} UTC. I've saved this to my private settings file (goku_settings.json) to keep your .env file safe!"
+                return f"✅ Done! I've updated your {slot} check-in to {hour:02d}:{minute:02d} UTC and saved it to my persistent memory."
             except Exception as e:
-                return f"I've updated the timer for now, but I couldn't save it to my settings file: {e}"
+                return f"I've updated the live timer, but couldn't save to settings: {e}"
 
         elif tool_name == "clear_history":
             if not session_id: return "Error: No session ID provided."

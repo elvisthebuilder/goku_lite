@@ -49,32 +49,34 @@ async def get_system_report():
     return ram, disk
 
 async def _morning_briefing():
-    """Send a professional system briefing."""
+    """Send a professional system briefing (Morning)."""
     from .config import config
-    
-    hour = datetime.utcnow().hour
-    if 5 <= hour < 12:
-        greeting = "Good morning"
-    elif 12 <= hour < 17:
-        greeting = "Good afternoon"
-    elif 17 <= hour < 21:
-        greeting = "Good evening"
-    else:
-        greeting = "Greetings"
-
     now = datetime.utcnow().strftime("%A, %B %d, %Y")
     ram, disk = await get_system_report()
-    
     msg = (
-        f"⚡ *{greeting}.* It is {now}.\n\n"
+        f"☀️ *Good Morning.* It is {now}.\n\n"
         f"*SYSTEM STATUS*\n"
         f"RAM: {ram}\n"
         f"Disk: {disk}\n\n"
-        f"*BRAIN STATUS*\n"
-        f"Model: {config.GOKU_MODEL or 'Unknown'}\n"
-        f"Database: {'Connected' if config.DATABASE_URL else 'Local'}\n"
-        f"Memory: {'Active' if config.QDRANT_API_KEY else 'Disabled'}\n\n"
-        f"All systems operational. Standing by."
+        f"I'm awake and standing by for your morning tasks."
+    )
+    await _push_message(msg)
+
+async def _afternoon_briefing():
+    """Send a professional system briefing (Afternoon)."""
+    now = datetime.utcnow().strftime("%H:%M UTC")
+    msg = (
+        f"🌤️ *Good Afternoon.* It is {now}.\n"
+        "Just checking in to see if everything is on track. Do you need any help with your current tasks?"
+    )
+    await _push_message(msg)
+
+async def _evening_briefing():
+    """Send a professional system briefing (Evening)."""
+    now = datetime.utcnow().strftime("%H:%M UTC")
+    msg = (
+        f"🌙 *Good Evening.* It is {now}.\n"
+        "The day is winding down. Shall we recap your wins and blockers, or prepare for tomorrow?"
     )
     await _push_message(msg)
 
@@ -131,31 +133,51 @@ async def schedule_one_time(delay_seconds: int, message: str):
     await asyncio.sleep(delay_seconds)
     await _push_message(f"⏰ *Reminder:* {message}")
 
-def set_briefing_time(hour: int, minute: int):
-    """Update the morning briefing schedule live."""
+def set_schedule_time(slot: str, hour: int, minute: int):
+    """Update a specific briefing slot live."""
+    job_id = f"{slot}_briefing"
     if scheduler.running:
-        scheduler.reschedule_job(
-            "morning_briefing",
-            trigger=CronTrigger(hour=hour, minute=minute)
-        )
-        logger.info(f"📅 Morning briefing rescheduled to {hour:02d}:{minute:02d} UTC.")
-        return True
+        try:
+            scheduler.reschedule_job(
+                job_id,
+                trigger=CronTrigger(hour=hour, minute=minute)
+            )
+            logger.info(f"📅 {slot.capitalize()} briefing rescheduled to {hour:02d}:{minute:02d} UTC.")
+            return True
+        except:
+            return False
     return False
 
-def start_scheduler(briefing_hour: int = 8, briefing_minute: int = 0):
+def start_scheduler(morning_time=(8, 0), afternoon_time=(14, 0), evening_time=(20, 0)):
     """Start the background scheduler for proactive tasks."""
     if scheduler.running:
         return
 
-    # Daily morning briefing
+    # 1. Morning briefing
     scheduler.add_job(
         _morning_briefing,
-        CronTrigger(hour=briefing_hour, minute=briefing_minute),
+        CronTrigger(hour=morning_time[0], minute=morning_time[1]),
         id="morning_briefing",
         replace_existing=True
     )
 
-    # Guardian check every 10 minutes
+    # 2. Afternoon briefing
+    scheduler.add_job(
+        _afternoon_briefing,
+        CronTrigger(hour=afternoon_time[0], minute=afternoon_time[1]),
+        id="afternoon_briefing",
+        replace_existing=True
+    )
+
+    # 3. Evening briefing
+    scheduler.add_job(
+        _evening_briefing,
+        CronTrigger(hour=evening_time[0], minute=evening_time[1]),
+        id="evening_briefing",
+        replace_existing=True
+    )
+
+    # 4. Guardian check every 10 minutes
     scheduler.add_job(
         _health_check,
         IntervalTrigger(minutes=10),
@@ -164,4 +186,4 @@ def start_scheduler(briefing_hour: int = 8, briefing_minute: int = 0):
     )
 
     scheduler.start()
-    logger.info(f"🕐 Goku Guardian active. Checking system every 10 minutes.")
+    logger.info(f"🕐 Goku Guardian active. Morning: {morning_time[0]:02d}:{morning_time[1]:02d}, Afternoon: {afternoon_time[0]:02d}:{afternoon_time[1]:02d}, Evening: {evening_time[0]:02d}:{evening_time[1]:02d} (UTC)")

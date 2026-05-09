@@ -60,9 +60,11 @@ async def start_gateway():
 async def lifespan(app: FastAPI):
     # Startup: Start scheduler and background gateway
     from server.scheduler import start_scheduler
-    briefing_hour = int(os.getenv("BRIEFING_HOUR", "8"))
-    briefing_minute = int(os.getenv("BRIEFING_MINUTE", "0"))
-    start_scheduler(briefing_hour=briefing_hour, briefing_minute=briefing_minute)
+    start_scheduler(
+        morning_time=(config.BRIEFING_HOUR, config.BRIEFING_MINUTE),
+        afternoon_time=(config.AFTERNOON_HOUR, config.AFTERNOON_MINUTE),
+        evening_time=(config.EVENING_HOUR, config.EVENING_MINUTE)
+    )
     
     gateway_task = asyncio.create_task(start_gateway())
     yield
