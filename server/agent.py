@@ -401,25 +401,68 @@ class CloudAgent:
                 
                 message = response.choices[0].message
                 tool_calls = getattr(message, 'tool_calls', None)
+                manual_tool_call = None
                 
-                if not tool_calls:
+                # Fallback: Catch Ollama models outputting JSON as raw text
+                if not tool_calls and message.content:
+                    import re
+                    json_match = re.search(r'\{.*"name".*".*".*"arguments".*\{.*\}.*\}', message.content, re.DOTALL)
+                    if json_match:
+                        try:
+                            import json
+                            manual_tool_call = json.loads(json_match.group())
+                            logger.info(f"Intercepted manual JSON tool call: {manual_tool_call['name']}")
+                        except:
+                            pass
+                
+                if not tool_calls and not manual_tool_call:
                     final_content = message.content
                     break
                     
-                # We have tool calls. Append the assistant message with tool_calls for strict API schemas
-                messages.append(message)
-                
                 # Execute Native Tool Calls
-                for tool_call in tool_calls:
-                    function_name = tool_call.function.name
+                if tool_calls:
+                    messages.append(message)
+                    for tool_call in tool_calls:
+                        function_name = tool_call.function.name
+                        try:
+                            function_args = json.loads(tool_call.function.arguments)
+                            tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                        except Exception as e:
+                            tool_output = f"Error executing {function_name}: {e}"
+                            
+                        messages.append({
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": function_name,
+                            "content": str(tool_output),
+                        })
+                        
+                # Execute Manual JSON Tool Calls (Spoofing Native Schema to prevent API errors)
+                elif manual_tool_call:
+                    function_name = manual_tool_call['name']
+                    function_args = manual_tool_call['arguments']
                     try:
-                        function_args = json.loads(tool_call.function.arguments)
                         tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
                     except Exception as e:
                         tool_output = f"Error executing {function_name}: {e}"
                         
+                    spoofed_id = "call_manual123"
                     messages.append({
-                        "tool_call_id": tool_call.id,
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": spoofed_id,
+                                "type": "function",
+                                "function": {
+                                    "name": function_name,
+                                    "arguments": json.dumps(function_args)
+                                }
+                            }
+                        ]
+                    })
+                    messages.append({
+                        "tool_call_id": spoofed_id,
                         "role": "tool",
                         "name": function_name,
                         "content": str(tool_output),
