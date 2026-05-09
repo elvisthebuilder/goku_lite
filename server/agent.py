@@ -351,8 +351,8 @@ class CloudAgent:
             "• Use <think> tags for complex logic or internal planning.\n"
             "• Keep thoughts silent and invisible to the end user.\n"
             "• Always prioritize the final output message over thought narration.\n"
-            "- **CRITICAL**: If you use a tool, you MUST NOT output any text outside the <think> tags. Your response should consist ONLY of the tool call. No narration like 'I will call...' or 'We need to...'.\n"
-            "- If you have nothing to say (e.g., background task done), respond with ONLY: `∅` (the null token)."
+            "- **CRITICAL**: When initiating a tool call, do NOT output any conversational text. Output ONLY the tool call.\n"
+            "- **CRITICAL**: After a tool completes and you see its result, you MUST provide a conversational response to the user summarizing the outcome. Never stay silent."
         )
         
         if messages and messages[0]["role"] == "system":
