@@ -317,8 +317,30 @@ class ToolRegistry:
             return f"Got it! I'll remind you about '{message}' in {delay_minutes} minute(s)."
 
         elif tool_name == "get_current_time":
-            from datetime import datetime
-            return f"The current server time is: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            from datetime import datetime, timedelta
+            now = datetime.utcnow()
+            
+            def get_countdown(h, m):
+                target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                if target <= now:
+                    target += timedelta(days=1)
+                diff = target - now
+                hours, remainder = divmod(int(diff.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                return f"{hours}h {minutes}m"
+
+            morning = get_countdown(config.BRIEFING_HOUR, config.BRIEFING_MINUTE)
+            afternoon = get_countdown(config.AFTERNOON_HOUR, config.AFTERNOON_MINUTE)
+            evening = get_countdown(config.EVENING_HOUR, config.EVENING_MINUTE)
+
+            return (
+                f"Current UTC Time: {now.strftime('%H:%M:%S')}\n"
+                f"Date: {now.strftime('%Y-%m-%d')}\n\n"
+                f"--- Persistent Schedule Status ---\n"
+                f"☀️ Morning Brief ({config.BRIEFING_HOUR:02d}:{config.BRIEFING_MINUTE:02d} UTC): Starts in {morning}\n"
+                f"🌤️ Afternoon Check ({config.AFTERNOON_HOUR:02d}:{config.AFTERNOON_MINUTE:02d} UTC): Starts in {afternoon}\n"
+                f"🌙 Evening Wrap ({config.EVENING_HOUR:02d}:{config.EVENING_MINUTE:02d} UTC): Starts in {evening}"
+            )
 
         elif tool_name == "get_system_metrics":
             try:
