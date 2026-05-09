@@ -517,7 +517,8 @@ class CloudAgent:
             if clean_content == "∅" or not clean_content.replace('∅', '').strip():
                 # If there are thoughts but no speech, return just the thoughts
                 if "<think>" in clean_content:
-                    return clean_content
+                    yield clean_content
+                    return
                 return
             
             # 8. Save final response
