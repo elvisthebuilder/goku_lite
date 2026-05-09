@@ -19,13 +19,11 @@ class CloudAgent:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         skills_dir = os.path.join(base_dir, "skills")
         if not os.path.exists(skills_dir):
-            yield ""
-            return
+            return ""
         
         skills = [f for f in os.listdir(skills_dir) if f.endswith(".md")]
         if not skills:
-            yield ""
-            return
+            return ""
         
         registry = "\n\n## Available Skills\n"
         registry += "You have these skill extensions available. You can read them using `read_file('skills/filename.md')` to activate their logic:\n"
@@ -70,8 +68,7 @@ class CloudAgent:
                 "- **Platform**: AWS EC2 (Ubuntu)\n"
             )
         except Exception:
-            yield ""
-            return
+            return ""
 
     def _get_system_prompt(self, session_id: str, source: str):
         """Generate the literal Goku v3.0 System Prompt."""
