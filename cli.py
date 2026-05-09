@@ -24,8 +24,6 @@ if not os.path.exists(env_path) or not os.getenv("GOKU_MODEL"):
         print(f"❌ Setup failed: {e}")
         sys.exit(1)
 
-from server.agent import agent
-from server.config import config
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -44,7 +42,7 @@ def show_help():
     table.add_row("/exit", "Close the CLI")
     console.print(table)
 
-def show_status():
+def show_status(config):
     table = Table(title="🌐 Cloud Infrastructure Status", show_header=True)
     table.add_column("Service", style="bold")
     table.add_column("Status")
@@ -65,12 +63,14 @@ def show_status():
 
 async def main():
     console.print(Panel("[bold red]🐉 Goku Lite CLI[/]\n[italic]The Cloud-Native Orchestrator[/]\nType '/help' for commands.", border_style="orange3"))
-    
+
+    # Lazy-load heavy dependencies AFTER the banner is shown
+    with console.status("[dim]Loading intelligence engine...[/]", spinner="dots"):
+        from server.agent import agent
+        from server.config import config
+
     config.validate()
     session_id = "cli_session"
-    
-    # 1. Start Session
-    # Goku starts ready, no ritual required.
 
     # 2. Interactive Loop
     while True:
@@ -86,7 +86,7 @@ async def main():
                 if cmd == "/help":
                     show_help()
                 elif cmd == "/status":
-                    show_status()
+                    show_status(config)
                 elif cmd == "/setup":
                     import subprocess
                     subprocess.run(["python3", "setup.py"])
