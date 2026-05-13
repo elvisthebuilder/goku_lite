@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, Comma
 from .agent import agent
 from .config import config
 from .history import history
+from .speech_service import transcribe_audio, generate_speech
 
 logger = logging.getLogger(__name__)
 
@@ -150,15 +151,50 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
                             except Exception:
                                 pass
                             transient_message = None
+                        
+                        # --- Voice Reply Handling ---
+                        is_voice_input = any("[Voice Note Transcript]" in m for m in messages)
+                        if partial_response.startswith("[VOICE_REPLY]: ") or (is_voice_input and not partial_response.startswith("[")):
+                            voice_text = partial_response.replace("[VOICE_REPLY]: ", "").strip()
+                            await context.bot.send_chat_action(chat_id=chat_id, action="record_voice")
                             
-                        chunks = split_message(partial_response)
-                        for i, chunk in enumerate(chunks):
-                            try:
-                                await reply_to_message.reply_text(chunk, parse_mode="Markdown")
-                            except Exception:
-                                await reply_to_message.reply_text(chunk)
-                            if len(chunks) > 1:
-                                await asyncio.sleep(0.3)
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                                tmp_path = tmp.name
+                            
+                            if await generate_speech(voice_text, tmp_path):
+                                try:
+                                    with open(tmp_path, "rb") as vf:
+                                        await reply_to_message.reply_voice(vf)
+                                except Exception as ve:
+                                    logger.error(f"Voice reply failed: {ve}")
+                                    await reply_to_message.reply_text(voice_text)
+                                finally:
+                                    if os.path.exists(tmp_path): os.remove(tmp_path)
+                            else:
+                                await reply_to_message.reply_text(voice_text)
+
+                        # --- Music Reply Handling ---
+                        elif partial_response.startswith("[MUSIC_REPLY]: "):
+                            music_path = partial_response.replace("[MUSIC_REPLY]: ", "").strip()
+                            if os.path.exists(music_path):
+                                try:
+                                    with open(music_path, "rb") as mf:
+                                        await reply_to_message.reply_audio(mf, title="Goku Composition")
+                                except Exception as me:
+                                    logger.error(f"Music delivery failed: {me}")
+                                finally:
+                                    if os.path.exists(music_path): os.remove(music_path)
+                        
+                        # --- Standard Text Reply ---
+                        else:
+                            chunks = split_message(partial_response)
+                            for i, chunk in enumerate(chunks):
+                                try:
+                                    await reply_to_message.reply_text(chunk, parse_mode="Markdown")
+                                except Exception:
+                                    await reply_to_message.reply_text(chunk)
+                                if len(chunks) > 1:
+                                    await asyncio.sleep(0.3)
                             
             await asyncio.sleep(0.5)
             stop_typing.set()
@@ -260,6 +296,49 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ Document Processing Error: {e}")
         await update.message.reply_text("📦 Trouble reading that doc. Make sure it's a valid PDF, Word, or Excel file.")
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle incoming voice notes and audio files."""
+    if not update.message or not (update.message.voice or update.message.audio):
+        return
+
+    voice = update.message.voice or update.message.audio
+    chat_id = str(update.message.chat_id)
+    
+    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
+            new_file = await context.bot.get_file(voice.file_id)
+            await new_file.download_to_drive(tmp.name)
+            tmp_path = tmp.name
+
+        # Transcribe
+        transcript = await transcribe_audio(tmp_path)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+        if not transcript:
+            await update.message.reply_text("⚠️ Could not transcribe that audio.")
+            return
+
+        user_text = f"[Voice Note Transcript]: {transcript}"
+        
+        # Buffer and trigger debounce just like text
+        _user_message_buffers[chat_id].append(user_text)
+        
+        if chat_id in _user_timers and not _user_timers[chat_id].done():
+            _user_timers[chat_id].cancel()
+
+        async def debounced_process():
+            await asyncio.sleep(DEBOUNCE_SECONDS)
+            await process_user_messages(chat_id, context, update.message)
+
+        _user_timers[chat_id] = asyncio.create_task(debounced_process())
+
+    except Exception as e:
+        logger.error(f"❌ Voice Processing Error: {e}")
+        await update.message.reply_text("📦 Trouble processing your voice note.")
+
 async def send_proactive_message(chat_id: str, text: str):
     """Send a message to a user without them initiating the conversation."""
     global _bot_instance
@@ -296,6 +375,7 @@ async def start_telegram_bot():
         # Add Message Handlers
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
         application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+        application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
         logger.info("🐉 Goku: Telegram bot initialized with Commands + Smart Queue...")
         await application.initialize()

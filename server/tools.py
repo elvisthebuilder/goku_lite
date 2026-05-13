@@ -216,6 +216,56 @@ class ToolRegistry:
                         "required": ["name"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "mcp_voice__list_voices",
+                    "description": "List all available ElevenLabs voices with their names and IDs.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "mcp_voice__set_active_voice",
+                    "description": "Set the active ElevenLabs voice ID for speech generation.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "voice_id": {"type": "string", "description": "The ElevenLabs voice ID."}
+                        },
+                        "required": ["voice_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "voice_reply",
+                    "description": "Send a spoken voice response instead of text. Use this when the user asks for audio or if more natural.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string", "description": "The text to convert to speech."}
+                        },
+                        "required": ["text"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "generate_music",
+                    "description": "Generate a 30-second music clip based on a prompt.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {"type": "string", "description": "Description of the music to generate."}
+                        },
+                        "required": ["prompt"]
+                    }
+                }
             }
         ]
 
@@ -453,6 +503,52 @@ class ToolRegistry:
             
             personality_manager.assign_personality(session_id, name)
             return f"Persona for this session updated to: {name}. I will adopt this identity in my next response."
+
+        elif tool_name == "mcp_voice__list_voices":
+            api_key = os.getenv("ELEVENLABS_API_KEY")
+            if not api_key: return "Error: ElevenLabs API Key missing."
+            try:
+                headers = {"xi-api-key": api_key}
+                resp = httpx.get("https://api.elevenlabs.io/v1/voices", headers=headers)
+                if resp.status_code == 200:
+                    voices = resp.json().get("voices", [])
+                    return "\n".join([f"- {v['name']}: `{v['voice_id']}`" for v in voices[:10]])
+                return f"Error fetching voices: {resp.text}"
+            except Exception as e: return f"Error: {e}"
+
+        elif tool_name == "mcp_voice__set_active_voice":
+            voice_id = args.get("voice_id")
+            # Update .env file (Safe write)
+            try:
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                env_path = os.path.join(base_dir, ".env")
+                if os.path.exists(env_path):
+                    with open(env_path, "r") as f: lines = f.readlines()
+                    new_lines = []
+                    found = False
+                    for line in lines:
+                        if line.startswith("ELEVENLABS_VOICE_ID="):
+                            new_lines.append(f"ELEVENLABS_VOICE_ID={voice_id}\n")
+                            found = True
+                        else: new_lines.append(line)
+                    if not found: new_lines.append(f"ELEVENLABS_VOICE_ID={voice_id}\n")
+                    with open(env_path, "w") as f: f.writelines(new_lines)
+                return f"Successfully set active voice ID to `{voice_id}`. This will be used for all future voice notes."
+            except Exception as e: return f"Error updating voice: {e}"
+
+        elif tool_name == "voice_reply":
+            text = args.get("text")
+            return f"[VOICE_REPLY]: {text}"
+
+        elif tool_name == "generate_music":
+            prompt = args.get("prompt")
+            ts = int(time.time())
+            out_path = f"uploads/music_{ts}.mp3"
+            os.makedirs("uploads", exist_ok=True)
+            from .speech_service import generate_music as gen_music
+            if await gen_music(prompt, out_path):
+                return f"[MUSIC_REPLY]: {out_path}"
+            return "Failed to generate music."
 
         return f"Unknown tool: {tool_name}"
 

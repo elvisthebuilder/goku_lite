@@ -18,6 +18,9 @@ class Config:
         self.DATABASE_URL = os.getenv("DATABASE_URL")
         self.TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
         self.GOKU_OWNER_ID = os.getenv("GOKU_OWNER_ID")
+        self.ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+        self.ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpg8ndclK7BJb")
+        self.GROQ_API_KEY = os.getenv("GROQ_API_KEY")
         
         # Scheduler defaults (Only managed via goku_settings.json now)
         self.BRIEFING_HOUR = 8
