@@ -91,6 +91,21 @@ async def generate_speech(text: str, output_path: Optional[str] = None) -> Union
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, headers=headers, json=data)
+            
+            # FALLBACK LOGIC: If configured voice is missing, fetch first available voice
+            if response.status_code == 404 and "voice_not_found" in response.text:
+                logger.warning(f"Voice ID {voice_id} not found. Attempting fallback to first available voice...")
+                list_url = "https://api.elevenlabs.io/v1/voices"
+                list_resp = await client.get(list_url, headers={"xi-api-key": elevenlabs_key})
+                if list_resp.status_code == 200:
+                    voices = list_resp.json().get("voices", [])
+                    if voices:
+                        fallback_id = voices[0]["voice_id"]
+                        logger.info(f"Using fallback voice: {voices[0]['name']} ({fallback_id})")
+                        # Retry with fallback
+                        fallback_url = f"{ELEVENLABS_TTS_URL}/{fallback_id}"
+                        response = await client.post(fallback_url, headers=headers, json=data)
+
             if response.status_code == 200:
                 if output_path:
                     with open(output_path, "wb") as f:
