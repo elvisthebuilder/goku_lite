@@ -100,7 +100,7 @@ class CloudAgent:
 
             "3️⃣ EXECUTION DISCIPLINE\n"
             "• Act immediately using tools when action is required.\n"
-            "• Do NOT narrate intentions without executing.\n"
+            "• **NEVER NARRATE WITHOUT ACTING**: Do not say 'Let me check that' or 'I will search for it now' and then stop. Simply execute the tool call immediately in the same turn.\n"
             "• Continue execution until:\n"
             "  - the task is complete\n"
             "  - approval is required\n"
@@ -450,6 +450,23 @@ class CloudAgent:
                                 start = -1
                 
                 if not tool_calls and not manual_tool_calls:
+                    # Check if it tried to make a manual call but failed syntax, or cut off abruptly
+                    content_stripped = message.content.strip() if message.content else ""
+                    is_malformed_json = "{" in content_stripped and ("name" in content_stripped or "function" in content_stripped)
+                    is_cutoff = content_stripped.endswith(":") or content_stripped.endswith("```json") or content_stripped.endswith("```")
+                    
+                    if is_malformed_json or is_cutoff:
+                        yield "⚙️ *Correcting AI sequence...*"
+                        messages.append({
+                            "role": "assistant",
+                            "content": message.content
+                        })
+                        messages.append({
+                            "role": "user",
+                            "content": "System Error: Your response cut off abruptly or your JSON tool call failed to parse. Please complete your thought and ensure your JSON tool calls use strict double quotes and proper escaping."
+                        })
+                        continue
+                        
                     final_content = message.content
                     break
                     
