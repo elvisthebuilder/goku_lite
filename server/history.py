@@ -82,6 +82,27 @@ class CloudHistory:
             messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
             return [{"role": m.role, "content": m.content} for m in messages]
 
+    def compact_history(self, session_id: str, summary: str, keep_count: int = 5):
+        """SQLAlchemy implementation of history compaction."""
+        with self.Session() as db:
+            messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
+            if len(messages) <= keep_count:
+                return
+
+            to_delete = messages[:-keep_count]
+            for m in to_delete:
+                db.delete(m)
+            
+            summary_msg = MessageModel(
+                session_id=session_id, 
+                role="system", 
+                content=f"[CONVERSATION SUMMARY]: {summary}",
+                msg_type="summary"
+            )
+            db.add(summary_msg)
+            db.commit()
+            logger.info(f"Compacted history for session {session_id}.")
+
     # --- Task Management (Cloud Native) ---
     def add_task(self, description: str):
         with self.Session() as db:
