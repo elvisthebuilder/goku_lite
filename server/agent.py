@@ -408,14 +408,19 @@ class CloudAgent:
             while iteration < max_iterations:
                 iteration += 1
                 
-                response = await litellm.acompletion(
-                    model=self.model,
-                    messages=messages,
-                    tools=tool_registry.tools,
-                    tool_choice="auto",
-                    api_key=api_key,
-                    api_base=api_base
-                )
+                try:
+                    response = await litellm.acompletion(
+                        model=self.model,
+                        messages=messages,
+                        tools=tool_registry.tools,
+                        tool_choice="auto",
+                        api_key=api_key,
+                        api_base=api_base,
+                        timeout=90 # Prevent infinite hangs
+                    )
+                except Exception as ce:
+                    logger.error(f"LiteLLM Completion Error: {ce}")
+                    break
                 
                 message = response.choices[0].message
                 tool_calls = getattr(message, 'tool_calls', None)
@@ -445,23 +450,6 @@ class CloudAgent:
                                 start = -1
                 
                 if not tool_calls and not manual_tool_calls:
-                    # Check if it tried to make a manual call but failed syntax, or cut off abruptly
-                    content_stripped = message.content.strip()
-                    is_malformed_json = "{" in message.content and ("name" in message.content or "function" in message.content)
-                    is_cutoff = content_stripped.endswith(":") or content_stripped.endswith("```json") or content_stripped.endswith("```")
-                    
-                    if is_malformed_json or is_cutoff:
-                        yield "⚙️ *Correcting AI sequence...*"
-                        messages.append({
-                            "role": "assistant",
-                            "content": message.content
-                        })
-                        messages.append({
-                            "role": "user",
-                            "content": "System Error: Your response cut off abruptly or your JSON tool call failed to parse. Please complete your thought and ensure your JSON tool calls use strict double quotes and proper escaping."
-                        })
-                        continue
-                        
                     final_content = message.content
                     break
                     
@@ -537,16 +525,17 @@ class CloudAgent:
                         "content": f"System Tool Execution Results:{combined_tool_output}"
                     })
                     
-            if (not final_content or not final_content.strip()) and iteration > 1:
-                # Force a final summary completion if the AI went silent after tools
+            if (not final_content or not final_content.strip()):
+                # Force a final completion if the AI went silent
                 try:
-                    logger.info("Forcing final summary completion...")
-                    messages.append({"role": "user", "content": "The tools have finished. Please provide a concise final summary of what you did for the user."})
+                    logger.info("Forcing final summary completion (Silent Model Recovery)...")
+                    messages.append({"role": "user", "content": "You didn't output any visible text. Please summarize your actions or answer my question directly."})
                     summary_resp = await litellm.acompletion(
                         model=self.model,
                         messages=messages,
                         api_key=api_key,
-                        api_base=api_base
+                        api_base=api_base,
+                        timeout=60
                     )
                     final_content = summary_resp.choices[0].message.content
                 except:
