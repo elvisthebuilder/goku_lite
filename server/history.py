@@ -1,5 +1,6 @@
 import logging
-from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey
+import json
+from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -20,12 +21,25 @@ class MessageModel(Base):
     __tablename__ = 'messages'
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String, ForeignKey('sessions.id'))
-    role = Column(String) # user, agent, system
+    role = Column(String) 
     content = Column(Text)
     msg_type = Column(String, default='message')
-    metadata_json = Column(Text) # JSON string
+    metadata_json = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     session = relationship("SessionModel", back_populates="messages")
+
+class TaskModel(Base):
+    __tablename__ = 'tasks'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    description = Column(Text)
+    completed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class SettingModel(Base):
+    __tablename__ = 'settings'
+    key = Column(String, primary_key=True)
+    value = Column(Text)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class CloudHistory:
     def __init__(self):
@@ -41,29 +55,24 @@ class CloudHistory:
             connect_args={"sslmode": "require"} if "sqlite" not in self.url else {}
         )
         
-        # Retry DB initialization for Neon cold starts (auto-suspend)
         import time
         for attempt in range(1, 4):
             try:
                 Base.metadata.create_all(self.engine)
                 break
             except Exception as e:
-                if attempt == 3:
-                    logger.error(f"DB init failed after 3 attempts: {e}")
-                    raise
-                logger.warning(f"DB cold start attempt {attempt}/3 failed. Retrying in {attempt * 2}s...")
+                if attempt == 3: raise
                 time.sleep(attempt * 2)
                 
         self.Session = sessionmaker(bind=self.engine)
 
+    # --- Message Management ---
     def add_message(self, session_id: str, role: str, content: str, msg_type: str = 'message'):
         with self.Session() as db:
-            # Ensure session exists
             session = db.query(SessionModel).filter_by(id=session_id).first()
             if not session:
                 session = SessionModel(id=session_id, title=content[:30] + "..." if len(content) > 30 else content)
                 db.add(session)
-            
             msg = MessageModel(session_id=session_id, role=role, content=content, msg_type=msg_type)
             db.add(msg)
             db.commit()
@@ -73,52 +82,42 @@ class CloudHistory:
             messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
             return [{"role": m.role, "content": m.content} for m in messages]
 
-    def compact_history(self, session_id: str, summary: str, keep_count: int = 5):
-        """
-        Implements history compaction.
-        Keeps the latest 'keep_count' messages and replaces the rest with a summary.
-        """
+    # --- Task Management (Cloud Native) ---
+    def add_task(self, description: str):
         with self.Session() as db:
-            messages = db.query(MessageModel).filter_by(session_id=session_id).order_by(MessageModel.created_at).all()
-            if len(messages) <= keep_count:
-                return
-
-            # Messages to delete (everything except the last 'keep_count')
-            to_delete = messages[:-keep_count]
-            for m in to_delete:
-                db.delete(m)
-            
-            # Insert the summary as a system message at the start
-            summary_msg = MessageModel(
-                session_id=session_id, 
-                role="system", 
-                content=f"[CONVERSATION SUMMARY]: {summary}",
-                msg_type="summary"
-            )
-            db.add(summary_msg)
+            task = TaskModel(description=description)
+            db.add(task)
             db.commit()
-            logger.info(f"Compacted history for session {session_id}. Kept last {keep_count} turns.")
+
+    def get_tasks(self):
+        with self.Session() as db:
+            return db.query(TaskModel).all()
+
+    def clear_tasks(self):
+        with self.Session() as db:
+            db.query(TaskModel).delete()
+            db.commit()
+
+    # --- Settings Management (Cloud Native) ---
+    def set_setting(self, key: str, value: str):
+        with self.Session() as db:
+            setting = db.query(SettingModel).filter_by(key=key).first()
+            if setting: setting.value = value
+            else: db.add(SettingModel(key=key, value=value))
+            db.commit()
+
+    def get_setting(self, key: str, default=None):
+        with self.Session() as db:
+            setting = db.query(SettingModel).filter_by(key=key).first()
+            return setting.value if setting else default
 
     def clear_history(self, session_id: str):
-        """Wipes all messages for a specific session."""
         with self.Session() as db:
             db.query(MessageModel).filter_by(session_id=session_id).delete()
             db.commit()
 
-    def delete_session(self, session_id: str):
-        """Deletes the entire session and its messages."""
-        with self.Session() as db:
-            session = db.query(SessionModel).filter_by(id=session_id).first()
-            if session:
-                db.delete(session)
-                db.commit()
-
     def wipe_all_data(self):
-        """DANGER: Wipes every single session and message in the entire database."""
-        with self.Session() as db:
-            # Drop all tables and recreate them to ensure a clean slate
-            Base.metadata.drop_all(self.engine)
-            Base.metadata.create_all(self.engine)
-            logger.info("SQL Database wiped clean (all sessions deleted).")
+        Base.metadata.drop_all(self.engine)
+        Base.metadata.create_all(self.engine)
 
 history = CloudHistory()

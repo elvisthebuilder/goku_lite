@@ -1,7 +1,7 @@
 import os
 import httpx
 import logging
-from typing import Optional
+from typing import Optional, Union
 from .config import config
 
 logger = logging.getLogger(__name__)
@@ -14,24 +14,19 @@ GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 OPENAI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
 ELEVENLABS_STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 
-async def transcribe_audio(file_path: str) -> Optional[str]:
+async def transcribe_audio(audio_data: Union[str, bytes]) -> Optional[str]:
     """
-    Transcribe an audio file using ElevenLabs (Scribe), Groq (Whisper), or OpenAI.
-    Gracefully returns None if no STT keys are configured.
+    Transcribe an audio file or raw bytes using ElevenLabs, Groq, or OpenAI.
     """
     groq_api_key = os.getenv("GROQ_API_KEY")
     openai_api_key = os.getenv("OPENAI_API_KEY")
     elevenlabs_key = os.getenv("ELEVENLABS_API_KEY")
 
     if not groq_api_key and not openai_api_key and not elevenlabs_key:
-        logger.info("Speech-to-Text requested, but no valid API keys found. Skipping transcription.")
+        logger.info("Speech-to-Text requested, but no valid API keys found.")
         return None
 
-    if not os.path.exists(file_path):
-        logger.error(f"Audio file not found: {file_path}")
-        return None
-
-    # Prefer ElevenLabs (Scribe) > Groq > OpenAI
+    # Resolve provider
     provider = "elevenlabs"
     if elevenlabs_key:
         url = ELEVENLABS_STT_URL
@@ -50,82 +45,85 @@ async def transcribe_audio(file_path: str) -> Optional[str]:
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            with open(file_path, "rb") as f:
-                files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
-                data = {"model_id": model} if provider == "elevenlabs" else {"model": model}
-                
-                response = await client.post(url, headers=headers, files=files, data=data)
-                
-                if response.status_code == 200:
-                    return response.json().get("text")
-                else:
-                    logger.error(f"STT API ({provider}) failed [{response.status_code}]: {response.text}")
-                    return None
+            if isinstance(audio_data, str):
+                if not os.path.exists(audio_data): return None
+                with open(audio_data, "rb") as f: content = f.read()
+                filename = os.path.basename(audio_data)
+            else:
+                content = audio_data
+                filename = "audio.ogg"
+
+            files = {"file": (filename, content, "application/octet-stream")}
+            data = {"model_id": model} if provider == "elevenlabs" else {"model": model}
+            
+            response = await client.post(url, headers=headers, files=files, data=data)
+            
+            if response.status_code == 200:
+                return response.json().get("text")
+            else:
+                logger.error(f"STT API ({provider}) failed [{response.status_code}]: {response.text}")
+                return None
                     
     except Exception as e:
         logger.error(f"Failed to transcribe audio via {provider}: {e}")
         return None
 
-async def generate_speech(text: str, output_path: str) -> bool:
+async def generate_speech(text: str, output_path: Optional[str] = None) -> Union[bool, bytes]:
     """
-    Generate speech from text using ElevenLabs.
+    Generate speech from text. Returns True/False if output_path is provided, 
+    otherwise returns raw audio bytes.
     """
     elevenlabs_key = os.getenv("ELEVENLABS_API_KEY")
     voice_id = os.getenv("ELEVENLABS_VOICE_ID", config.ELEVENLABS_VOICE_ID)
 
     if not elevenlabs_key:
         logger.info("Text-to-Speech requested, but no ELEVENLABS_API_KEY found.")
-        return False
+        return False if output_path else None
 
     url = f"{ELEVENLABS_TTS_URL}/{voice_id}"
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": elevenlabs_key
-    }
-    
+    headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": elevenlabs_key}
     data = {
         "text": text,
         "model_id": "eleven_turbo_v2_5",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
-        }
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
     }
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            async with client.stream("POST", url, headers=headers, json=data) as response:
-                if response.status_code == 200:
+            response = await client.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                if output_path:
                     with open(output_path, "wb") as f:
-                        async for chunk in response.aiter_bytes():
-                            f.write(chunk)
+                        f.write(response.content)
                     return True
-                else:
-                    error_msg = await response.aread()
-                    logger.error(f"ElevenLabs API failed ({response.status_code}): {error_msg.decode('utf-8')}")
-                    return False
+                return response.content
+            else:
+                logger.error(f"ElevenLabs API failed ({response.status_code}): {response.text}")
+                return False if output_path else None
     except Exception as e:
         logger.error(f"Failed to generate speech: {e}")
-        return False
+        return False if output_path else None
 
-async def generate_music(prompt: str, output_path: str) -> bool:
-    """Generate music from a prompt using ElevenLabs."""
+async def generate_music(prompt: str, output_path: Optional[str] = None) -> Union[bool, bytes]:
+    """Generate music from a prompt. Returns True/False if output_path provided, else bytes."""
     elevenlabs_key = os.getenv("ELEVENLABS_API_KEY")
-    if not elevenlabs_key: return False
+    if not elevenlabs_key: return False if output_path else None
 
     headers = {"xi-api-key": elevenlabs_key, "Content-Type": "application/json"}
     data = {"prompt": prompt, "music_length_ms": 30000}
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream("POST", ELEVENLABS_MUSIC_URL, headers=headers, json=data) as response:
-                if response.status_code == 200:
+            response = await client.post(ELEVENLABS_MUSIC_URL, headers=headers, json=data)
+            if response.status_code == 200:
+                if output_path:
                     with open(output_path, "wb") as f:
-                        async for chunk in response.aiter_bytes():
-                            f.write(chunk)
+                        f.write(response.content)
                     return True
-        return False
+                return response.content
+            else:
+                logger.error(f"ElevenLabs Music API failed ({response.status_code}): {response.text}")
+                return False if output_path else None
     except Exception as e:
         logger.error(f"Music generation error: {e}")
-        return False
+        return False if output_path else None

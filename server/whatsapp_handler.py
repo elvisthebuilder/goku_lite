@@ -2,6 +2,8 @@ import logging
 import asyncio
 import os
 import time
+import subprocess
+import tempfile
 from neonize.client import NewClient
 from neonize.events import MessageEv
 from .agent import agent
@@ -12,18 +14,19 @@ logger = logging.getLogger(__name__)
 
 async def start_whatsapp_bot():
     """Goku Lite WhatsApp Interface (powered by Neonize)."""
+    # Determine a writable path for the session database
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    uploads_dir = os.path.join(base_dir, "uploads")
-    try:
-        os.makedirs(uploads_dir, exist_ok=True)
-    except PermissionError:
-        logger.warning(f"⚠️ Permission denied creating {uploads_dir}. Using temporary fallback.")
-        import tempfile
-        uploads_dir = os.path.join(tempfile.gettempdir(), "goku_wa_uploads")
-        os.makedirs(uploads_dir, exist_ok=True)
-    
-    # Use a small sqlite file for the session only.
     db_path = os.path.join(base_dir, "goku_lite_wa.db")
+    
+    try:
+        # Check if writable
+        test_file = os.path.join(base_dir, ".write_test")
+        with open(test_file, "w") as f: f.write("test")
+        os.remove(test_file)
+    except PermissionError:
+        logger.warning("Project directory not writable. Moving session DB to /tmp for Cloud Native fluidity.")
+        db_path = os.path.join(tempfile.gettempdir(), "goku_lite_wa.db")
+    
     client = NewClient(db_path)
 
     @client.event(MessageEv)
@@ -34,7 +37,6 @@ async def start_whatsapp_bot():
         
         user_text = ""
         is_voice = False
-        attachment_path = None
 
         # 1. Detect Content Type
         if msg.conversation:
@@ -47,13 +49,8 @@ async def start_whatsapp_bot():
             try:
                 audio_bytes = client.download_any(msg)
                 if audio_bytes:
-                    ts = int(time.time())
-                    attachment_path = os.path.join(uploads_dir, f"wa_v_{ts}.ogg")
-                    with open(attachment_path, "wb") as f:
-                        f.write(audio_bytes)
-                    
-                    # Transcribe
-                    transcript = await transcribe_audio(attachment_path)
+                    # Transcribe directly from bytes (Cloud Native)
+                    transcript = await transcribe_audio(audio_bytes)
                     if transcript:
                         user_text = f"[Voice Note Transcript]: {transcript}"
                     else:
@@ -71,32 +68,29 @@ async def start_whatsapp_bot():
             # 2. Chat with Agent
             has_response = False
             async for partial_response in agent.chat(user_text, session_id=session_id, source="whatsapp"):
-                if not partial_response:
-                    continue
-                
-                if partial_response.startswith("⚙️"):
-                    continue
+                if not partial_response: continue
+                if partial_response.startswith("⚙️"): continue
                 
                 has_response = True
                 
                 # --- Voice Reply Handling ---
                 if partial_response.startswith("[VOICE_REPLY]: ") or (is_voice and not partial_response.startswith("[")):
                     voice_text = partial_response.replace("[VOICE_REPLY]: ", "").strip()
-                    ts = int(time.time())
-                    rp = os.path.join(uploads_dir, f"wa_r_{ts}.mp3")
-                    op = os.path.join(uploads_dir, f"wa_r_{ts}.ogg")
+                    audio_bytes = await generate_speech(voice_text)
                     
-                    if await generate_speech(voice_text, rp):
+                    if audio_bytes:
                         try:
-                            # Convert to ogg/opus for WhatsApp PTT compatibility
-                            import subprocess
-                            subprocess.run(["ffmpeg", "-y", "-i", rp, "-c:a", "libopus", op], 
-                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            # Convert to ogg/opus via pipe (Stateless/Diskless)
+                            process = subprocess.Popen(
+                                ["ffmpeg", "-i", "pipe:0", "-c:a", "libopus", "-f", "ogg", "pipe:1"],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                            )
+                            buff, err = process.communicate(input=audio_bytes)
                             
-                            fpath = op if os.path.exists(op) else rp
-                            with open(fpath, "rb") as af:
-                                buff = af.read()
-                            
+                            if not buff and err:
+                                logger.error(f"FFmpeg conversion failed: {err.decode()}")
+                                buff = audio_bytes # Fallback to original bytes
+
                             # Upload and send as AudioMessage (PTT=True)
                             from neonize.proto.waE2E.WAWebProtobufsE2E_pb2 import AudioMessage, Message as WAMessage
                             upload_res = client.upload(buff)
@@ -114,22 +108,21 @@ async def start_whatsapp_bot():
                         except Exception as ve:
                             logger.error(f"Voice reply delivery failed: {ve}")
                             client.send_message(chat_jid, voice_text)
-                        finally:
-                            for p in [rp, op]:
-                                if os.path.exists(p): os.remove(p)
                     else:
                         client.send_message(chat_jid, voice_text)
                 
                 # --- Music Reply Handling ---
                 elif partial_response.startswith("[MUSIC_REPLY]: "):
-                    rel_path = partial_response.replace("[MUSIC_REPLY]: ", "").strip()
-                    music_path = os.path.join(base_dir, rel_path)
-                    if os.path.exists(music_path):
+                    # The tool now returns the prompt or a temporary path. 
+                    # For Cloud Native, we'll assume it's a request to generate bytes.
+                    music_prompt = partial_response.replace("[MUSIC_REPLY]: ", "").strip()
+                    from .speech_service import generate_music
+                    music_bytes = await generate_music(music_prompt)
+                    
+                    if music_bytes:
                         try:
-                            with open(music_path, "rb") as mf:
-                                buff = mf.read()
                             from neonize.proto.waE2E.WAWebProtobufsE2E_pb2 import AudioMessage, Message as WAMessage
-                            upload_res = client.upload(buff)
+                            upload_res = client.upload(music_bytes)
                             audio_msg = AudioMessage(
                                 URL=upload_res.url,
                                 directPath=upload_res.DirectPath,
@@ -153,7 +146,7 @@ async def start_whatsapp_bot():
         except Exception as e:
             logger.error(f"WhatsApp Handler Error: {e}")
 
-    logger.info("🐉 Goku Lite: WhatsApp bot initializing...")
+    logger.info("🐉 Goku Lite: WhatsApp bot initializing (Cloud Native mode)...")
     client.connect()
 
 if __name__ == "__main__":
