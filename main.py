@@ -45,11 +45,15 @@ async def start_gateway():
     # Start Telegram
     if config.TELEGRAM_BOT_TOKEN:
         tasks.append(start_telegram_bot())
+    else:
+        logger.warning("Telegram bot token missing. Skipping Telegram.")
     
     # Start WhatsApp (Optional)
     if os.getenv("ENABLE_WHATSAPP") == "True":
         from server.whatsapp_handler import start_whatsapp_bot
         tasks.append(start_whatsapp_bot())
+    else:
+        logger.info("WhatsApp bot is disabled (ENABLE_WHATSAPP != True).")
     
     if tasks:
         await asyncio.gather(*tasks)
