@@ -14,7 +14,13 @@ async def start_whatsapp_bot():
     """Goku Lite WhatsApp Interface (powered by Neonize)."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     uploads_dir = os.path.join(base_dir, "uploads")
-    os.makedirs(uploads_dir, exist_ok=True)
+    try:
+        os.makedirs(uploads_dir, exist_ok=True)
+    except PermissionError:
+        logger.warning(f"⚠️ Permission denied creating {uploads_dir}. Using temporary fallback.")
+        import tempfile
+        uploads_dir = os.path.join(tempfile.gettempdir(), "goku_wa_uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
     
     # Use a small sqlite file for the session only.
     db_path = os.path.join(base_dir, "goku_lite_wa.db")

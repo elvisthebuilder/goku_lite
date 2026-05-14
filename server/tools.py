@@ -13,7 +13,13 @@ class ToolRegistry:
     def __init__(self):
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.uploads_dir = os.path.join(self.base_dir, "uploads")
-        os.makedirs(self.uploads_dir, exist_ok=True)
+        try:
+            os.makedirs(self.uploads_dir, exist_ok=True)
+        except PermissionError:
+            logger.warning(f"⚠️ Permission denied creating {self.uploads_dir}. Using temporary fallback.")
+            import tempfile
+            self.uploads_dir = os.path.join(tempfile.gettempdir(), "goku_uploads")
+            os.makedirs(self.uploads_dir, exist_ok=True)
         
         self.tools = [
             {
