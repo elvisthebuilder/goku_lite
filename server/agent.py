@@ -3,6 +3,7 @@ import asyncio
 import litellm
 import json
 import logging
+from collections import defaultdict
 from .config import config
 from .history import history
 from .tools import tool_registry
@@ -597,10 +598,11 @@ class CloudAgent:
             yield clean_content
             
         except Exception as e:
+            logger.error(f"Cloud LLM Error: {e}")
             if "stuck in a loop" in str(e).lower():
                 yield "I notice I may be stuck in a loop. What do you actually need from me right now?"
+            else:
+                yield f"Sorry, I encountered an error with the cloud brain: {e}"
             return
-            logger.error(f"Cloud LLM Error: {e}")
-            yield f"Sorry, I encountered an error with the cloud brain: {e}"
 
 agent = CloudAgent()
