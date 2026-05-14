@@ -193,6 +193,49 @@ async def main():
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     env_path = os.path.join(base_dir, ".env")
+    load_dotenv(env_path)
+
+    # --- CONFIGURATION STATUS TABLE ---
+    table = Table(title="Current Cloud Configuration Status", show_header=True, header_style="bold magenta")
+    table.add_column("Component", style="cyan", width=30)
+    table.add_column("Status", width=15)
+    table.add_column("Current Key (Masked)", style="dim")
+
+    services = [
+        ("AI Brain (Model)", "GOKU_MODEL", False),
+        ("OpenAI Key", "OPENAI_API_KEY", True),
+        ("Anthropic Key", "ANTHROPIC_API_KEY", True),
+        ("Gemini Key", "GEMINI_API_KEY", True),
+        ("Ollama Endpoint", "OLLAMA_API_BASE", False),
+        ("Database URL", "DATABASE_URL", True),
+        ("Qdrant (Memory) URL", "QDRANT_URL", False),
+        ("Qdrant API Key", "QDRANT_API_KEY", True),
+        ("Tavily (Search)", "TAVILY_API_KEY", True),
+        ("ElevenLabs (Voice)", "ELEVENLABS_API_KEY", True),
+        ("Telegram Token", "TELEGRAM_BOT_TOKEN", True),
+        ("WhatsApp Enabled", "ENABLE_WHATSAPP", False),
+        ("Owner ID", "GOKU_OWNER_ID", False),
+    ]
+
+    for label, env_key, is_secret in services:
+        val = os.getenv(env_key)
+        if val:
+            status = "[green]✅ Configured[/]"
+            if is_secret:
+                # Mask secret: show first 4 and last 4
+                if len(val) > 10:
+                    display_val = f"{val[:4]}...{val[-4:]}"
+                else:
+                    display_val = "****"
+            else:
+                display_val = val
+        else:
+            status = "[red]❌ Missing[/]"
+            display_val = "-"
+        table.add_row(label, status, display_val)
+
+    console.print(table)
+    console.print("")
     
     success = False
     try:
