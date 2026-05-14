@@ -247,10 +247,9 @@ class CloudAgent:
 
             "23️⃣ VOICE, AUDIO & MUSIC CAPABILITIES\n"
             "• You are powered by **ElevenLabs** for all TTS, STT, and Music Generation operations.\n"
+            "• **MANDATORY**: If you want to send a voice note, you MUST call the `voice_reply` tool. Simply typing the message is NOT enough.\n"
+            "• **MANDATORY**: If you want to send music or a song, you MUST call the `generate_music` tool.\n"
             "• Use the `mcp_voice__list_voices` and `mcp_voice__set_active_voice` tools to manage your voice persona.\n"
-            "• **SINGING**: If the user asks you to sing or generate a song, use the `generate_music` tool.\n"
-            "• Never suggest using legacy tools like `espeak`, `festival`, or `gtts`. Always use ElevenLabs.\n"
-            "• When a user sends a voice note, your response will automatically be converted to a voice note if you were summoned via voice.\n\n"
 
             "24️⃣ SOCIAL AWARENESS & MENTIONS\n"
             "• You are a participant in social environments (Groups/DMs).\n"
@@ -480,6 +479,10 @@ class CloudAgent:
                             "content": str(tool_output),
                         })
                         
+                        # SIGNAL: Yield special tool outputs (Voice/Music) to handlers
+                        if str(tool_output).startswith("["):
+                            yield str(tool_output)
+                        
                 # Execute Manual JSON Tool Calls (Text-Based History for Ollama Compatibility)
                 elif manual_tool_calls:
                     # Append the model's exact text output so it remembers its chain of thought
@@ -504,6 +507,10 @@ class CloudAgent:
                             tool_output = f"Error executing {function_name}: {e}"
                             
                         combined_tool_output += f"\n\n--- Result of {function_name} ---\n{tool_output}"
+                        
+                        # SIGNAL: Yield special tool outputs (Voice/Music) to handlers
+                        if str(tool_output).startswith("["):
+                            yield str(tool_output)
                         
                     # Feed the results back as a 'user' message so Ollama can read it natively
                     messages.append({
