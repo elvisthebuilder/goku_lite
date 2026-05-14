@@ -165,10 +165,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     user_text = update.message.text
     chat_id = str(update.message.chat_id)
+    username = update.message.from_user.username or "Unknown"
+    
+    logger.info(f"📩 Telegram incoming: [{username}] ({chat_id}): {user_text}")
     
     # Auth & Mention logic
     owner_id = os.getenv("GOKU_OWNER_ID")
     if owner_id and chat_id != owner_id and update.message.chat.type == "private":
+        logger.warning(f"🚫 Unauthorized access attempt from {chat_id}")
         await update.message.reply_text("⚠️ Access Denied.")
         return
 
@@ -177,8 +181,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _user_timers[chat_id].cancel()
 
     async def debounced_process():
-        await asyncio.sleep(DEBOUNCE_SECONDS)
-        await process_user_messages(chat_id, context, update.message)
+        try:
+            await asyncio.sleep(DEBOUNCE_SECONDS)
+            logger.info(f"🤖 Goku is thinking for {chat_id}...")
+            await process_user_messages(chat_id, context, update.message)
+        except Exception as de:
+            logger.error(f"💥 Debounced Process Error: {de}")
 
     _user_timers[chat_id] = asyncio.create_task(debounced_process())
 
