@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 class ToolRegistry:
     def __init__(self):
+        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.uploads_dir = os.path.join(self.base_dir, "uploads")
+        os.makedirs(self.uploads_dir, exist_ok=True)
+        
         self.tools = [
             {
                 "type": "function",
@@ -543,11 +547,13 @@ class ToolRegistry:
         elif tool_name == "generate_music":
             prompt = args.get("prompt")
             ts = int(time.time())
-            out_path = f"uploads/music_{ts}.mp3"
-            os.makedirs("uploads", exist_ok=True)
+            filename = f"music_{ts}.mp3"
+            out_path = os.path.join(self.uploads_dir, filename)
+            
             from .speech_service import generate_music as gen_music
             if await gen_music(prompt, out_path):
-                return f"[MUSIC_REPLY]: {out_path}"
+                # Return relative path for handlers to find
+                return f"[MUSIC_REPLY]: uploads/{filename}"
             return "Failed to generate music."
 
         return f"Unknown tool: {tool_name}"

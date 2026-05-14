@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 
 async def start_whatsapp_bot():
     """Goku Lite WhatsApp Interface (powered by Neonize)."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    uploads_dir = os.path.join(base_dir, "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    
     # Use a small sqlite file for the session only.
-    client = NewClient("goku_lite_wa.db")
+    db_path = os.path.join(base_dir, "goku_lite_wa.db")
+    client = NewClient(db_path)
 
     @client.event(MessageEv)
     async def on_message(client: NewClient, message: MessageEv):
@@ -34,11 +39,10 @@ async def start_whatsapp_bot():
             is_voice = True
             logger.info(f"Incoming voice note from {session_id}...")
             try:
-                os.makedirs("uploads", exist_ok=True)
                 audio_bytes = client.download_any(msg)
                 if audio_bytes:
                     ts = int(time.time())
-                    attachment_path = f"uploads/wa_v_{ts}.ogg"
+                    attachment_path = os.path.join(uploads_dir, f"wa_v_{ts}.ogg")
                     with open(attachment_path, "wb") as f:
                         f.write(audio_bytes)
                     
@@ -73,8 +77,8 @@ async def start_whatsapp_bot():
                 if partial_response.startswith("[VOICE_REPLY]: ") or (is_voice and not partial_response.startswith("[")):
                     voice_text = partial_response.replace("[VOICE_REPLY]: ", "").strip()
                     ts = int(time.time())
-                    rp = f"uploads/wa_r_{ts}.mp3"
-                    op = f"uploads/wa_r_{ts}.ogg"
+                    rp = os.path.join(uploads_dir, f"wa_r_{ts}.mp3")
+                    op = os.path.join(uploads_dir, f"wa_r_{ts}.ogg")
                     
                     if await generate_speech(voice_text, rp):
                         try:
@@ -112,7 +116,8 @@ async def start_whatsapp_bot():
                 
                 # --- Music Reply Handling ---
                 elif partial_response.startswith("[MUSIC_REPLY]: "):
-                    music_path = partial_response.replace("[MUSIC_REPLY]: ", "").strip()
+                    rel_path = partial_response.replace("[MUSIC_REPLY]: ", "").strip()
+                    music_path = os.path.join(base_dir, rel_path)
                     if os.path.exists(music_path):
                         try:
                             with open(music_path, "rb") as mf:

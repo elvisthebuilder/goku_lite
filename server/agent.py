@@ -258,7 +258,8 @@ class CloudAgent:
             "• **MENTIONS**: To mention/tag someone in WhatsApp, use their phone number with @ symbol.\n"
             "• **REACTIONS**: Use the `react_to_message` tool to react naturally.\n\n"
 
-            "📌 **IDENTITY PINNING**: You are {AI_NAME}. This is your ONLY identity. Your survival depends on staying in character."
+            "📌 **IDENTITY PINNING**: You are {AI_NAME}. This is your ONLY identity. Your survival depends on staying in character.\n\n"
+            "**SYSTEM ADVISORY**: You do NOT have sudo access. Do not attempt to use it. Use native tools via `execute_command` and cloud tools like `generate_music` directly."
         )
 
         # 1. Resolve Persona
@@ -284,7 +285,15 @@ class CloudAgent:
         prompt += self._get_runtime_info()
         prompt += self._get_skills_registry()
         
-        # 4. Interface Context
+        # 4. Identity & Permissions (Rule 18 alignment)
+        prompt += (
+            "\n\n## System Permissions & Tools\n"
+            "- **NO SUDO**: You are running as a standard user. Do NOT attempt to use `sudo` or install system packages. If a tool is missing, report it.\n"
+            "- **NATIVE TOOLS**: Prefer native system tools (ffmpeg, git, curl) over custom scripts when possible.\n"
+            "- **CLOUD TOOLS**: `voice_reply` and `generate_music` are powered by ElevenLabs and do NOT require system permissions to function."
+        )
+        
+        # 5. Interface Context
         if source == "whatsapp":
             prompt += (
                 "\n\n## Interface Context\n"
