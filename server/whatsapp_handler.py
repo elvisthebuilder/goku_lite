@@ -76,9 +76,11 @@ async def start_whatsapp_bot():
                 # --- Voice Reply Handling ---
                 if partial_response.startswith("[VOICE_REPLY]: ") or (is_voice and not partial_response.startswith("[")):
                     voice_text = partial_response.replace("[VOICE_REPLY]: ", "").strip()
+                    logger.info(f"🎤 Requesting TTS for: {voice_text[:50]}...")
                     audio_bytes = await generate_speech(voice_text)
                     
                     if audio_bytes:
+                        logger.info(f"✅ TTS Success: {len(audio_bytes)} bytes received.")
                         try:
                             # Convert to ogg/opus via pipe (Stateless/Diskless)
                             process = subprocess.Popen(
@@ -87,8 +89,11 @@ async def start_whatsapp_bot():
                             )
                             buff, err = process.communicate(input=audio_bytes)
                             
-                            if not buff and err:
-                                logger.error(f"FFmpeg conversion failed: {err.decode()}")
+                            if buff:
+                                logger.info(f"🎵 FFmpeg Success: {len(buff)} bytes converted.")
+                            else:
+                                if err: logger.error(f"❌ FFmpeg Error: {err.decode()}")
+                                logger.warning("⚠️ FFmpeg failed, falling back to raw bytes.")
                                 buff = audio_bytes # Fallback to original bytes
 
                             # Upload and send as AudioMessage (PTT=True)

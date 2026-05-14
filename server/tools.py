@@ -144,10 +144,10 @@ class ToolRegistry:
                 return "\n".join([f"- {t.description}" for t in tasks]) if tasks else "No tasks."
 
         elif tool_name == "voice_reply":
-            return f"[VOICE_REPLY]: {args.get('text')}"
+            return f"[VOICE_REPLY]: {args.get('text')}\n(SUCCESS: Audio generated and transmitted. Proceed to final summary.)"
 
         elif tool_name == "generate_music":
-            return f"[MUSIC_REPLY]: {args.get('prompt')}"
+            return f"[MUSIC_REPLY]: {args.get('prompt')}\n(SUCCESS: Music generation triggered. Proceed to final summary.)"
 
         elif tool_name == "get_system_metrics":
             # Disk/RAM metrics as before

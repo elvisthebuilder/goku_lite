@@ -107,10 +107,12 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
                         is_voice_input = any("[Voice Note Transcript]" in m for m in messages)
                         if partial_response.startswith("[VOICE_REPLY]: ") or (is_voice_input and not partial_response.startswith("[")):
                             voice_text = partial_response.replace("[VOICE_REPLY]: ", "").strip()
+                            logger.info(f"🎤 [TG] Requesting TTS: {voice_text[:50]}...")
                             await context.bot.send_chat_action(chat_id=chat_id, action="record_voice")
                             
                             audio_bytes = await generate_speech(voice_text)
                             if audio_bytes:
+                                logger.info(f"✅ [TG] TTS Success: {len(audio_bytes)} bytes.")
                                 try:
                                     # Convert to ogg via pipe (Stateless)
                                     process = subprocess.Popen(
@@ -118,6 +120,11 @@ async def process_user_messages(chat_id: str, context: ContextTypes.DEFAULT_TYPE
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
                                     )
                                     buff, err = process.communicate(input=audio_bytes)
+                                    if buff:
+                                        logger.info(f"🎵 [TG] FFmpeg Success: {len(buff)} bytes.")
+                                    else:
+                                        if err: logger.error(f"❌ [TG] FFmpeg Error: {err.decode()}")
+                                    
                                     final_audio = io.BytesIO(buff if buff else audio_bytes)
                                     await reply_to_message.reply_voice(final_audio)
                                 except Exception as ve:

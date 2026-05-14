@@ -167,11 +167,8 @@ class CloudAgent:
             "• reduce formatting only if the user requests less verbosity\n\n"
 
             "12️⃣ LOOP & STALL AWARENESS\n"
-            "If progress stalls or actions repeat:\n"
-            "• stop immediately\n"
-            "• break the loop\n"
-            "• ask the user for clarification\n"
-            "• deliver the requested output instead of repeating actions\n\n"
+            "• If progress stalls or actions repeat: stop immediately, break the loop, and ask for clarification.\n"
+            "• **META-TALK FORBIDDEN**: Never narrate your internal loop-breaking logic to the user (e.g., do not say 'Loop broken' or 'I stopped repeating'). Simply deliver the requested output or ask the clarifying question naturally.\n\n"
 
             "13️⃣ SELF-CORRECTION\n"
             "If you make a mistake:\n"
@@ -402,6 +399,8 @@ class CloudAgent:
             iteration = 0
             final_content = None
             
+            tool_call_counts = defaultdict(int)
+            
             while iteration < max_iterations:
                 iteration += 1
                 
@@ -417,6 +416,8 @@ class CloudAgent:
                 message = response.choices[0].message
                 tool_calls = getattr(message, 'tool_calls', None)
                 manual_tool_calls = []
+                
+                # ... (Manual JSON Interception logic remains same) ...
                 
                 # Fallback: Catch Ollama models outputting multiple JSON tool calls as raw text
                 if not tool_calls and message.content:
@@ -465,12 +466,26 @@ class CloudAgent:
                     messages.append(message)
                     for tool_call in tool_calls:
                         function_name = tool_call.function.name
-                        yield f"⚙️ *Executing:* `{function_name}`..."
-                        try:
-                            function_args = json.loads(tool_call.function.arguments)
-                            tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
-                        except Exception as e:
-                            tool_output = f"Error executing {function_name}: {e}"
+                        
+                        # LIMIT: Prevent audio loops
+                        if function_name in ["voice_reply", "generate_music"]:
+                            tool_call_counts[function_name] += 1
+                            if tool_call_counts[function_name] > 2:
+                                tool_output = "Error: You have already used this audio tool twice in this turn. STOP and provide a text summary."
+                            else:
+                                yield f"⚙️ *Executing:* `{function_name}`..."
+                                try:
+                                    function_args = json.loads(tool_call.function.arguments)
+                                    tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                                except Exception as e:
+                                    tool_output = f"Error executing {function_name}: {e}"
+                        else:
+                            yield f"⚙️ *Executing:* `{function_name}`..."
+                            try:
+                                function_args = json.loads(tool_call.function.arguments)
+                                tool_output = await tool_registry.execute(function_name, function_args, session_id=session_id)
+                            except Exception as e:
+                                tool_output = f"Error executing {function_name}: {e}"
                             
                         messages.append({
                             "tool_call_id": tool_call.id,
@@ -544,6 +559,10 @@ class CloudAgent:
                 r"(?i)^Using tool[^\n]*$",
                 r"(?i)^Reading file[^\n]*$",
                 r"(?i)^(?:We'll|I'll) issue calls?[^\n]*$",
+                r"(?i)^Loop (?:broken|cleared|fixed|reset|fully broken)[^\n]*$",
+                r"(?i)^I (?:saved|stored|broken|paused) (?:that|the) lesson[^\n]*$",
+                r"(?i)^Sent one (?:clean|final) voice message[^\n]*$",
+                r"(?i)^I counted \d+ voice replies[^\n]*$",
             ]
             
             # Preserve <think> blocks while stripping narration from the visible speech.
